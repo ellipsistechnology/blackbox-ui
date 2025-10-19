@@ -1,54 +1,45 @@
 <script setup lang="ts">
 import {BApp} from 'bootstrap-vue-next'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
+import Menu from './components/Menu.vue'
+import Sidebar from './components/Sidebar.vue'
+import { ref } from 'vue'
+import SplitColumns from './components/SplitColumns.vue'
+import ServerSummary from './components/ServerSummary.vue'
+import type Service from './types/Service'
+import ServiceView from './components/ServiceView.vue'
+import type { ServiceNode } from './BlackboxClient'
+
+const showSidebar = ref(false)
+const selectedServer = ref<{url:string}|null>(null)
+const selectedServiceNode = ref<ServiceNode|null>(null)
 </script>
 
 <template>
   <BApp>
-    <header>
-      <nav class="navbar navbar-dark bg-dark navbar-expand-lg">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="#">Navbar</a>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-          </button>
-          <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-              <li class="nav-item">
-                <a class="nav-link active" aria-current="page" href="#">Home</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="#">Link</a>
-              </li>
-              <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  Dropdown
-                </a>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="#">Action</a></li>
-                  <li><a class="dropdown-item" href="#">Another action</a></li>
-                  <li><hr class="dropdown-divider"></li>
-                  <li><a class="dropdown-item" href="#">Something else here</a></li>
-                </ul>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link disabled">Disabled</a>
-              </li>
-            </ul>
-            <form class="d-flex" role="search">
-              <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
-              <button class="btn btn-outline-success" type="submit">Search</button>
-            </form>
-          </div>
-        </div>
-      </nav>
-    </header>
+    <div class="d-flex flex-column h-100">
 
-    <main>
-      MAIN
-    </main>
+      <header class="flex-shrink-0">
+        <Menu @toggleSidebar="showSidebar = !showSidebar"></Menu>
+      </header>
+
+      <main class="flex-grow-1 overflow-auto">
+        <SplitColumns :show-left="showSidebar" :min-width-left=100 :min-width-right=200 initial-split="250px" class="h-100">
+          <template #left>
+            <Sidebar 
+              @select-server="server => {selectedServer = server; selectedServiceNode = null}"
+              @select-service="service => {selectedServiceNode = service; selectedServer = null}"
+            ></Sidebar>
+          </template>
+          <template #right>
+            <div>
+              <ServerSummary v-if="selectedServer" :url="selectedServer?.url"></ServerSummary>
+              <ServiceView v-else-if="selectedServiceNode" :show-objects="true" :serviceNode="selectedServiceNode"></ServiceView>
+            </div>
+          </template>
+        </SplitColumns>
+      </main>
+    </div>
   </BApp>
 </template>
 
-<style scoped>
-</style>

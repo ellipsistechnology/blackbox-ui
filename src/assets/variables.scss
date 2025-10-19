@@ -1,3 +1,8 @@
+/*
+ * Bootstrap overrides:
+ */
+
+// Colour scheme:
 $white:    #fff;
 $gray-100: #f8f9fa;
 $gray-200: #e9ecef;
@@ -19,25 +24,32 @@ $red: rgb(242, 84, 45);
 
 $dark: $gray-800;
 $light: $gray-100;
-$body-bg: $gray-900;
-$body-color: $gray-100;
-$jumbotron-bg: $black;
-$list-group-bg: $dark;
-$list-group-border-color: rgba($white, .125);
-$card-border-color: rgba($white, .125);
-$card-bg: rgba($white, .1);
-$card-cap-bg: rgba($black, .1);
-$modal-content-bg: $gray-800;
 
 $primary: $cyan;
 $info: $pink;
 $secondary: $blue;
 
+// Body and component colours:
+$body-bg: $gray-900;
+$body-color: $gray-100;
+
+$jumbotron-bg: $black;
+
+$list-group-bg: $dark;
+$list-group-border-color: rgba($white, .125);
+
+$card-border-color: rgba($white, .125);
+$card-bg: rgba($white, .1);
+$card-cap-bg: rgba($black, .1);
+
+$modal-content-bg: $gray-800;
+
 $component-active-color: $dark;
-$nav-tabs-link-active-color: $light;
+
 $breadcrumb-bg: $gray-800;
 $breadcrumb-divider-color: $gray-500;
 $breadcrumb-active-color: $light;
+
 $pagination-bg: $gray-800;
 $pagination-border-color: $gray-700;
 $pagination-hover-bg: $gray-800;
@@ -46,6 +58,20 @@ $pagination-disabled-bg: $dark;
 $pagination-disabled-border-color: $gray-800;
 $pagination-disabled-color: $gray-700;
 
+$nav-tabs-link-active-color: $light;
+
 $dropdown-link-hover-bg: $gray-200;
 $dropdown-bg: $gray-700;
 $dropdown-link-hover-bg: rgba($cyan, 0.2);
+
+$list-group-hover-bg: rgba($cyan, 0.1);
+$list-group-action-hover-color: $light;
+$list-group-bg: $body-bg;
+$list-group-action-active-bg: rgba($cyan, 0.2);
+
+// Fonts:
+$font-family-sans-serif: "Helvetica Neue", "Calibri Light", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+$font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+// Custom:
+$nav-item-hover-bg: rgba($cyan, 0.1);

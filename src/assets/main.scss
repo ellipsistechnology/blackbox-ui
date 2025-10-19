@@ -3,3 +3,28 @@
 @import "bootstrap/scss/bootstrap";
 @import "bootstrap-vue-next/src/styles/styles.scss";
 
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+
+/**
+ * Custom styles
+ */
+
+ .nav-item:hover {
+    background-color: $nav-item-hover-bg;
+    border-radius: .25rem;
+}
+
+.no-hover-effect {
+  // Use Sass to target the button within the class
+  &.btn {
+    &:hover {
+      // Set background and border color to their original (non-hover) values
+      background-color: transparent !important; // Or the color of the button's non-hover state
+      border-color: transparent !important;     // Reset border color if needed
+      
+      // Set text color to its original (non-hover) value
+      color: inherit !important; // Inherits text color from the parent, which is the button itself
+    }
+  }
+}

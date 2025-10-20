@@ -69,6 +69,12 @@ $list-group-action-hover-color: $light;
 $list-group-bg: $body-bg;
 $list-group-action-active-bg: rgba($cyan, 0.2);
 
+$popover-body-color: $info;
+$popover-body-padding-y: 5px;
+$popover-body-padding-x: 15px;
+$popover-bg: $dark;
+$popover-max-width: 500px;
+
 // Fonts:
 $font-family-sans-serif: "Helvetica Neue", "Calibri Light", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 $font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;

@@ -1,15 +1,53 @@
 import Service from './types/Service.js'
 
+export type Action = 'get' | 'add' | 'replace' | 'delete' | 'update'
+const methodToActionMap: {[method: string]: Action} = {
+    'GET': 'get',
+    'POST': 'add',
+    'PUT': 'replace',
+    'PATCH': 'update',
+    'DELETE': 'delete'
+}
+
 // TODO: check response codes and handle errors.
 
 async function getServiceList(url: string | URL): Promise<ServiceReference[]> {
-    const response = await fetch(url)
-    const data = await response.json()
-    return data.services.map((s: any) => new ServiceReference(url, s.href, s.name))
+    if(typeof url === 'string') {
+        url = new URL(url)
+    }
+    
+    try {
+        const response = await fetch(url)
+        const data = await response.json()
+        if(!data.services || !Array.isArray(data.services)) {
+            console.log(`No services array found in response from ${url}: `, data)
+            return []
+        }
+        return data.services.map((s: any) => new ServiceReference(new URL(s.href, url), s.name))
+    } catch (err) {
+        console.error(`Error fetching service list from ${url}: `, err)
+        return []
+    }
+}
+
+async function getActions(url: URL): Promise<Action[]> {
+    const response = await fetch(url, {method: 'OPTIONS'})
+    const options = response.headers.get('allow')
+    if(options) {
+        return options.split(',')
+            .map(o => methodToActionMap[o.trim().toUpperCase()])
+            .filter(a => a !== undefined) as Action[]
+    } else {
+        console.error(`No Allow header in OPTIONS response from ${url}.`)
+        return []
+    }
 }
 
 export class RootNode {
-    constructor(public url: string | URL) {}
+    url: URL
+    constructor(url: string | URL) {
+        this.url = typeof url === 'string' ? new URL(url) : url
+    }
 
     async getServiceList(): Promise<ServiceReference[]> {
         return await getServiceList(this.url)
@@ -18,15 +56,17 @@ export class RootNode {
 
 export class ServiceReference {
     constructor(
-        public root: string|URL, // FIXME: Using a root url may be an issue for remote services.
-        public href: string, 
+        public url: URL,
         public name: string
     ) {}
 
     async getServiceNode(): Promise<ServiceNode> {
-        const response = await fetch(new URL(this.href+'?meta', this.root))
+        const serviceUrl = new URL(this.url)
+        serviceUrl.searchParams.set('meta', '')
+
+        const response = await fetch(serviceUrl)
         const data = await response.json()
-        data.root = this.root
+        data.url = this.url
         return new ServiceNode(data as Service)
     }
 }
@@ -39,17 +79,28 @@ export class ServiceNode {
      * service's access is unique.
      */
     async getObjects(): Promise<ObjectReference[]> {
+        const props = await fetch(this.service.url)
+        const data = await props.json()
+        
         if(this.service.access === 'unique') {
-            return [new ObjectReference(this.service.root, this.service.href, {})]
+            // Get the single object:
+            return [new ObjectReference(this.service.url, data)]
         } else {
-            const response = await fetch(new URL(this.service.href, this.service.root))
-            const data = await response.json()
-            return data.objects.map((o: any, i: number) => {
-                if(this.service.access === 'indexed') {
-                    return new ObjectReference(this.service.root, `${this.service.href}/${i}`, o)
+            // On error return a single reference with an error set:
+            if(!Array.isArray(data)) {
+                console.error(`Service did not return an array when access type is ${this.service.access}. Returned: `, data);
+                return [new ObjectReference(undefined, undefined, /*error=*/data)]
+            }
+
+            // Create object references for each lsited object:
+            return data.map((o: any, i: number) => {
+                if(this.service.access === 'index') {
+                    const objectUrl = new URL(`${this.service.url.href}/${i}`, this.service.url)
+                    return new ObjectReference(objectUrl, o)
                 } else {
                     const id = this.service.identifier ? o[this.service.identifier] : o.id
-                    return new ObjectReference(this.service.root, `${this.service.href}/${id}`, o)
+                    const objectUrl = new URL(`${this.service.url.href}/${id}`, this.service.url)
+                    return new ObjectReference(objectUrl, o)
                 }
             })
         }
@@ -63,32 +114,48 @@ export class ServiceNode {
         if(this.service.access !== 'unique') {
             throw new Error('Only services with unique access can have subservices. Did you forget to fetch the objects first?')
         }
-        return await getServiceList(new URL(this.service.href+'?meta', this.service.root))
+        const metaUrl = new URL(this.service.url)
+        metaUrl.searchParams.set('meta', '')
+        return await getServiceList(metaUrl)
+    }
+
+    async getActions(): Promise<Action[]> {
+        return await getActions(this.service.url)
     }
 }
 
 export class ObjectReference {
     constructor(
-        public root: string|URL, 
-        public href: string, 
-        public props: any
+        public url?: URL,
+        public props?: any,
+        public error?: any
     ) {}
 
     async getObjectNode(): Promise<ObjectNode> {
-        // Get the metadata:
-        const meta = await fetch(new URL(`${this.href}?meta=true`, this.root))
-        const metadata = await meta.json()
+        if(this.error || !this.url) {
+            throw new Error(`Cannot get object node: ${this.error}`)
+        }
+        
+        // Get the metadata if available:
+        let metadata: any
+        try {
+            const metaUrl = new URL(this.url!)
+            metaUrl.searchParams.set('meta', '')
+            const meta = await fetch(metaUrl)
+            metadata = await meta.json()
+        } catch (err) {
+            console.error(`Could not fetch metadata for object at ${this.url}: `, err)
+        }
 
-        const response = await fetch(new URL(this.href, this.root))
+        const response = await fetch(this.url)
         const data = await response.json()
-        return new ObjectNode(this.root, this.href, data, metadata)
+        return new ObjectNode(this.url, data, metadata)
     }
 }
 
 export class ObjectNode {
     constructor(
-        public root: string|URL, 
-        public href: string, 
+        public url: URL, 
         public object: any, 
         public metadata: any
     ) {}
@@ -97,59 +164,13 @@ export class ObjectNode {
      * Get a list of subservices.
      * May be empty.
      */
-    async getServiceLIst(): Promise<ServiceReference[]> {
-        return await getServiceList(new URL(this.href+'?meta', this.root))
+    async getServiceList(): Promise<ServiceReference[]> {        
+        const metaUrl = new URL(this.url)
+        metaUrl.searchParams.set('meta', '')
+        return await getServiceList(metaUrl)
+    }
+
+    async getActions(): Promise<Action[]> {
+        return await getActions(this.url)
     }
 }
-
-/**
- * Navigates a blackbox API.
- */
-// export default class BlackboxClient {
-//     constructor(private apiUrl: string) {}
-
-//     /**
-//      * 
-//      * 
-//      * @returns A list of services available from the blackbox API.
-//      */
-//     async listServices(resolveServices = true): Promise<ServiceList> {
-//         const url = new URL(this.apiUrl)
-//         console.log(`checking url pathname '${url.pathname}'`);
-        
-//         if(url.pathname !== '/') {
-//             url.pathname += '?meta'
-//         }
-//         const response = await fetch(this.apiUrl)
-//         const data = await response.json()
-
-//         if(!resolveServices) {
-//             return data as ServiceList
-//         }
-
-//         if(!Array.isArray(data.services)) {
-//             // TODO: Log error.
-//             throw new Error('Invalid service list received from blackbox API')
-//         }
-
-//         data.services = await Promise.all(data.services.map(async (s: any) => {
-//             const serviceUrl = new URL(s.href, url)
-//             serviceUrl.searchParams.append('meta', 'true')
-//             const serviceResponse = await fetch(serviceUrl.toString())
-//             const serviceResponseJson = await serviceResponse.json()
-//             serviceResponseJson.root = url.toString()
-//             return serviceResponseJson as Service
-//         }))
-
-//         console.log(data);
-        
-
-//         return data
-//     }
-
-//     async listObjects(href: string) {
-//         const objectUrl = new URL(href, this.apiUrl)
-//         const objects = await fetch(objectUrl.toString())
-//         return objects.json()
-//     }
-// }

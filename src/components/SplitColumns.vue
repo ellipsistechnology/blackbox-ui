@@ -81,7 +81,7 @@ onMounted(() => {
         <div :class="showLeft && showRight ? '' : 'd-none'" class="gutter" id="splitter">
             <div class="bg-dark"></div>
         </div>
-        <div :class="showRight ? '' : 'd-none'" class="p-0 m-0" id="right-column">
+        <div :class="showRight ? '' : 'd-none'" class="flex-fill p-0 m-0" id="right-column">
             <slot name="right"></slot>
         </div>
     </div>

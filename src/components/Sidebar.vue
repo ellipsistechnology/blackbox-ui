@@ -1,26 +1,21 @@
 <script setup lang="ts">
 import { defineEmits, ref } from 'vue'
 import CollapsableList from './CollapsableList.vue'
-// import BlackboxClient from '@/BlackboxClient'
-import type Service from '@/types/Service'
 import { RootNode, ServiceReference } from '@/BlackboxClient'
 
 const emit = defineEmits(['selectServer', 'selectService'])
 
-const selectedServer = ref<{url:string}|null>(null)
-const selectedService = ref<ServiceReference|null>(null)
-const servers = ref([{ url: 'http://localhost:3000' }])
+const servers = ref([
+    { url: 'http://localhost:3000' },
+    { url: 'http://localhost:3001' }
+])
 const services = ref<ServiceReference[]>([])
 
 function selectServer(server: {url:string}) {
-    selectedService.value = null
-    selectedServer.value = server
-    emit('selectServer', server)
+    emit('selectServer', new RootNode(server.url))
 }
 
 async function selectService(service: ServiceReference) {
-    selectedServer.value = null
-    selectedService.value = service
     emit('selectService', await service.getServiceNode())
 }
 
@@ -52,8 +47,7 @@ function loadServices() {
                 <div class="list-group rounded-0">
                     <a v-for="server in servers" 
                         @click="selectServer(server)" 
-                        href="#" 
-                        :class="server.url === selectedServer?.url ? 'active' : ''" 
+                        href="#"
                         class="list-group-item list-group-item-action p-0 ps-2 pe-2 border-0"
                     >
                         {{ server.url }}
@@ -71,8 +65,7 @@ function loadServices() {
                 <div class="list-group rounded-0">
                     <a v-for="serviceRef in services"
                         href="#" 
-                        @click="selectService(serviceRef)" 
-                        :class="serviceRef === selectedService ? 'active' : ''" 
+                        @click="selectService(serviceRef)"
                         class="list-group-item list-group-item-action p-0 ps-2 pe-2 border-0"
                     >
                         {{ serviceRef.name }}

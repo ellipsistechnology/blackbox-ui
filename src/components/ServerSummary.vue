@@ -8,15 +8,18 @@ import { RootNode, ServiceNode } from '@/BlackboxClient'
 const serviceList = ref<ServiceNode[]|null>(null)
 
 const props = defineProps({
-    url: {
-        type: String
+    rootNode: {
+        type: RootNode
     }
 })
 
-watch(() => props.url, async (newUrl) => {
+watch(() => props.rootNode, async (newRootNode) => {
+    if(newRootNode == null) {
+        serviceList.value = null
+        return
+    }
     try {
-        // serviceList.value = await new BlackboxClient(newUrl!).listServices()
-        const references = await new RootNode(newUrl!).getServiceList()
+        const references = await newRootNode.getServiceList()
         serviceList.value = await Promise.all(references.map(async ref => await ref.getServiceNode()))
     } catch (e) {
         serviceList.value = null
@@ -26,10 +29,10 @@ watch(() => props.url, async (newUrl) => {
 </script>
 
 <template>
-    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.href" class="border-bottom border-dark">
+    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="border-bottom border-dark">
         <ServiceView :serviceNode="serviceNode"></ServiceView>
     </div>
     <div v-else>
-        Loading from {{ url }}...
+        Loading from {{ rootNode?.url }}...
     </div>
 </template>

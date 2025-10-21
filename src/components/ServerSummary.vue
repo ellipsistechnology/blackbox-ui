@@ -29,7 +29,7 @@ watch(() => props.rootNode, async (newRootNode) => {
 </script>
 
 <template>
-    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="border-bottom border-dark">
+    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="mt-4 p-0">
         <ServiceView :serviceNode="serviceNode"></ServiceView>
     </div>
     <div v-else>

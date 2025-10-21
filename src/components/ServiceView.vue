@@ -7,7 +7,7 @@ const props = defineProps<{
     showObjects?: boolean
 }>()
 
-const emit = defineEmits(['selectObject'])
+const emit = defineEmits(['selectObject', 'newObject'])
 
 const objects = ref<ObjectReference[]>([])
 const values = ref<any[]>([])
@@ -45,10 +45,14 @@ async function selectObject(obj: ObjectReference) {
     emit('selectObject', objectNode)
 }
 
+function createObject() {
+    emit('newObject')
+}
 </script>
 
 <template>
     <div class="ps-2 pe-2">
+        <!-- Service details: -->
         <div class="d-flex flex-row mb-1">
             <div class="border-end border-dark pe-3 me-3">
                 <h1 class="mb-0">{{ serviceNode.service.name}}</h1>
@@ -58,10 +62,15 @@ async function selectObject(obj: ObjectReference) {
             </div>
         </div>
         <div class="mb-3 mt-2">{{ serviceNode.service.description }}</div>
+
+        <!-- Objects list: -->
         <div v-if="showObjects">
+            <!-- Toolbar: -->
             <div class="d-flex flex-row justify-content-between mb-1 bg-dark">
                 <div>
-                    <button class="btn border-0"><i class="bi bi-plus-lg"></i></button>
+                    <button @click="createObject()" class="btn border-0">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
                     <button class="btn border-0 disabled"><i class="bi bi-trash3"></i></button>
                 </div>
                 <div>
@@ -69,6 +78,8 @@ async function selectObject(obj: ObjectReference) {
                     <button class="btn border-0 disabled"><i class="bi bi-list-ul"></i></button>
                 </div>
             </div>
+
+            <!-- Objects: -->
             <div class="list-group list-group-flush">
                 <a v-for="obj in objects" 
                     href="#" 

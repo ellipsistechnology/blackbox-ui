@@ -7,7 +7,7 @@ import { onMounted, ref, watch } from 'vue'
 import SplitColumns from './components/SplitColumns.vue'
 import ServerSummary from './components/ServerSummary.vue'
 import ServiceView from './components/ServiceView.vue'
-import { RootNode, ServiceNode, type ObjectNode } from './BlackboxClient'
+import { ObjectNode, RootNode, ServiceNode } from './BlackboxClient'
 import ObjectView from './components/ObjectView.vue'
 import * as bootstrap from 'bootstrap'
 
@@ -26,15 +26,14 @@ const selectedType = ref<NodeType | null>(null)
 const selectedNode = ref<Node | null>(null)
 const breadcrumbs = ref<Breadcrumb[]>([])
 const popover = ref<bootstrap.Popover|null>(null)
+const infoMessage = ref<string | null>(null)
+const errorMessage = ref<string | null>(null)
+const isNewObject = ref<boolean>(false)
 
 function setPopover() {
-  console.log(`setting popover`);
-  
   const content = document.getElementById('popover-content')
   const pos = document.querySelectorAll('[data-bs-toggle="popover"]')
   pos.forEach(popoverEl => { // should only be 1
-    console.log(`Got popover:`, popoverEl);
-    
     popover.value = new bootstrap.Popover(popoverEl, {
       placement: 'left',
       trigger: 'click',
@@ -44,10 +43,6 @@ function setPopover() {
     })
   })
 }
-
-// watch(() => selectedNode.value, () => {
-//   setPopover()
-// }, {deep: true})
 
 onMounted(setPopover)
 
@@ -60,11 +55,13 @@ function jumpToBreadcrumb(index: number) {
 
   selectedNode.value = crumb.node
   selectedType.value = crumb.type
+  isNewObject.value = false
 }
 
 function setNode(type: NodeType, node: Node, reset: boolean) {
   selectedNode.value = node
   selectedType.value = type
+  isNewObject.value = false
 
   if(selectedType.value === 'server') {
     // Starting a new breadcrumb trail from the selected server:
@@ -110,19 +107,82 @@ function setNode(type: NodeType, node: Node, reset: boolean) {
   }
 }
 
+function showToast(type: 'error' | 'info', message: string) {
+    if(type === 'error') {
+        errorMessage.value = message
+    } else {
+        infoMessage.value = message
+    }
+    const toastEl = document.getElementById(type === 'error' ? 'errorToast' : 'infoToast')
+    if(!toastEl) return
+
+    const bsToast = new bootstrap.Toast(toastEl!)
+    bsToast.show()
+}
+
 function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text)
     .then(() => {
-        const toastEl = document.getElementById('copyConfirmation')
-        const bsToast = new bootstrap.Toast(toastEl!)
-        bsToast.show()
-
-        setTimeout(() => {
-            if(popover.value) {
-                popover.value.hide()
-            }
-        }, 1000);
+      showToast('info', 'Copied to clipboard')
+      setTimeout(() => {
+          if(popover.value) {
+              popover.value.hide()
+          }
+      }, 1000);
     });
+}
+
+function urlChanged(oldUrl: string, newUrl: string) {
+    // Update the last breadcrumb with the new URL:
+    const crumb = breadcrumbs.value[breadcrumbs.value.length - 1]
+    if(!crumb) return
+
+    if(crumb.url.toString().startsWith(oldUrl)) {
+        const updatedUrl = new URL(crumb.url.toString().replace(oldUrl, newUrl))
+        crumb.url = updatedUrl
+        crumb.label = decodeURIComponent(updatedUrl.pathname.split('/').pop() || '?')
+    }
+}
+
+function deleteObject(_: ObjectNode) {
+  // Go back to the service view:
+  breadcrumbs.value.pop()
+  const crumb = breadcrumbs.value[breadcrumbs.value.length - 1]
+  if(!crumb) return
+
+  selectedNode.value = crumb.node
+  selectedType.value = crumb.type
+  isNewObject.value = false
+}
+
+function newObject() {
+    // Create a new object under the current service:
+    const crumb = breadcrumbs.value[breadcrumbs.value.length - 1]
+    if(!crumb || crumb.type !== 'service') {
+        showToast('error', 'Cannot create new object: no service selected.')
+        return
+    }
+
+    const serviceNode = crumb.node as ServiceNode
+    const newUrl = new URL(serviceNode.service.url.toString() + '/<new>')
+    const newObjNode = new ObjectNode(
+      new URL(serviceNode.service.url.toString() + '/<new>'), 
+      serviceNode.service, 
+      {}, 
+      undefined
+    )
+
+    // Add breadcrumb for the new object:
+    breadcrumbs.value.push({
+        type: 'object',
+        node: newObjNode,
+        label: 'New',
+        url: newUrl
+    })
+
+    selectedNode.value = newObjNode
+    selectedType.value = 'object'
+    isNewObject.value = true
 }
 </script>
 
@@ -143,6 +203,7 @@ function copyToClipboard(text: string) {
             ></Sidebar>
           </template>
           <template #right>
+            <!-- Breadcrumbs nav: -->
             <nav class="d-flex flex-row m-2 p-1 ps-2">
               <ol class="breadcrumb m-0 bg-transparent">
                 <li v-for="(crumb, index) in breadcrumbs" class="breadcrumb-item" :class="index === breadcrumbs.length-1 ? 'active' : ''">
@@ -169,16 +230,9 @@ function copyToClipboard(text: string) {
                       </div>
                   </div>
               </div>
-              <div class="toast-container position-fixed top-0 end-0 p-3">
-                  <div id="copyConfirmation" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                      <div class="toast-header">
-                          <i class="bi bi-copy me-2"></i>
-                          <strong class="me-auto">Copied to clipboard</strong>
-                          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                      </div>
-                  </div>
-              </div>
             </nav>
+
+            <!-- Main Body -->
             <div>
 
               <ServerSummary 
@@ -191,18 +245,45 @@ function copyToClipboard(text: string) {
                 :show-objects="true" 
                 :serviceNode="selectedNode as ServiceNode"
                 @select-object="objectNode => setNode('object', objectNode, false)"
+                @new-object="newObject()"
               ></ServiceView>
 
               <ObjectView 
                 v-else-if="selectedType === 'object'" 
                 :objectNode="selectedNode as ObjectNode"
-                @select-service="serviceNode => setNode('service', serviceNode, false)"
+                @service-selected="serviceNode => setNode('service', serviceNode, false)"
+                @info="message => showToast('info', message)"
+                @error="message => showToast('error', message)"
+                @url-changed="urlChanged"
+                @object-deleted="deleteObject"
+                @object-saved="isNewObject = false"
+                :is-new="isNewObject"
               ></ObjectView>
 
             </div>
           </template>
         </SplitColumns>
       </main>
+    </div>
+    
+    <!-- Toast containers -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="infoToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="bi bi-copy me-2"></i>
+                <strong class="me-auto">{{infoMessage}}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="errorToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="bi bi-copy me-2"></i>
+                <strong class="me-auto text-danger">{{errorMessage}}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
     </div>
   </BApp>
 </template>

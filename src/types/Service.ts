@@ -1,3 +1,5 @@
+import type Oas3schema from "./Oas3schema";
+
 export default class Service {
   constructor(
     public name: string,
@@ -6,7 +8,10 @@ export default class Service {
     public description?: string,
     public access?: string,
     public identifier?: string,
-    public type?: object
+    public type?: {
+      format?: string,
+      schema?: {href: string} | Oas3schema
+    }
   ) {}
 }
 

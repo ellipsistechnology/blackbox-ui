@@ -65,8 +65,9 @@ export class ServiceReference {
         serviceUrl.searchParams.set('meta', '')
 
         const response = await fetch(serviceUrl)
-        const data = await response.json()
+        const data = await response.json() as Service
         data.url = this.url
+
         return new ServiceNode(data as Service)
     }
 }
@@ -84,23 +85,23 @@ export class ServiceNode {
         
         if(this.service.access === 'unique') {
             // Get the single object:
-            return [new ObjectReference(this.service.url, data)]
+            return [new ObjectReference(this.service.url, this.service, data)]
         } else {
             // On error return a single reference with an error set:
             if(!Array.isArray(data)) {
                 console.error(`Service did not return an array when access type is ${this.service.access}. Returned: `, data);
-                return [new ObjectReference(undefined, undefined, /*error=*/data)]
+                return [new ObjectReference(undefined, this.service, undefined, /*error=*/data)]
             }
 
             // Create object references for each lsited object:
             return data.map((o: any, i: number) => {
                 if(this.service.access === 'index') {
                     const objectUrl = new URL(`${this.service.url.href}/${i}`, this.service.url)
-                    return new ObjectReference(objectUrl, o)
+                    return new ObjectReference(objectUrl, this.service, o)
                 } else {
                     const id = this.service.identifier ? o[this.service.identifier] : o.id
                     const objectUrl = new URL(`${this.service.url.href}/${id}`, this.service.url)
-                    return new ObjectReference(objectUrl, o)
+                    return new ObjectReference(objectUrl, this.service, o)
                 }
             })
         }
@@ -127,12 +128,13 @@ export class ServiceNode {
 export class ObjectReference {
     constructor(
         public url?: URL,
+        public service?: Service,
         public props?: any,
         public error?: any
     ) {}
 
     async getObjectNode(): Promise<ObjectNode> {
-        if(this.error || !this.url) {
+        if(this.error || !this.url || !this.service) {
             throw new Error(`Cannot get object node: ${this.error}`)
         }
         
@@ -149,13 +151,14 @@ export class ObjectReference {
 
         const response = await fetch(this.url)
         const data = await response.json()
-        return new ObjectNode(this.url, data, metadata)
+        return new ObjectNode(this.url, this.service, data, metadata)
     }
 }
 
 export class ObjectNode {
     constructor(
-        public url: URL, 
+        public url: URL,
+        public service: Service,
         public object: any, 
         public metadata: any
     ) {}
@@ -172,5 +175,39 @@ export class ObjectNode {
 
     async getActions(): Promise<Action[]> {
         return await getActions(this.url)
+    }
+
+    async deleteObject(): Promise<void> {
+        await fetch(this.url, {method: 'DELETE'})
+    }
+    
+    async update(): Promise<void> {
+        await fetch(this.url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(this.object)
+        })
+    }
+
+    async replace(): Promise<void> {
+        await fetch(this.url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(this.object)
+        })
+    }
+
+    async create(): Promise<void> {
+        await fetch(this.service.url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(this.object)
+        })
     }
 }

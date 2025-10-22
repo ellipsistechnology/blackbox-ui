@@ -124,6 +124,7 @@ function revert() {
     props.objectNode.object = JSON.parse(JSON.stringify(originalObject.value))
 }
 
+// TODO: prompt for confirmation
 async function deleteObject() {
     try {
         await props.objectNode.deleteObject()
@@ -174,8 +175,10 @@ async function deleteObject() {
     <!-- Object properties: -->
     <form v-if="typeof objectNode.object === 'object' && objectSchema?.type === 'object'" class="ps-2 mt-2 border-top border-dark pt-2">
         <div v-for="key in Object.keys(objectSchema.properties as object)" :key="key" class="row p-1">
-            <label class="col-sm-2 col-form-label col-form-label-sm text-end" :for="key">{{ key }}</label>
-            <div class="col-sm-8">
+            <label class="col-sm-2 col-form-label col-form-label-sm text-end pe-2" :for="key">
+                <strong>{{ key }}</strong>
+            </label>
+            <div class="col-sm-8 ps-1">
                 <input 
                     class="form-control-sm" 
                     :readonly="!editing && !isNew" 
@@ -195,10 +198,5 @@ async function deleteObject() {
         <div v-for="serviceRef in servicelist" class="list-group list-group-flush">
             <a href="#" @click="selectService(serviceRef)" class="list-group-item list-group-item-action ps-2 pe-2 pt-1 pb-1"><strong>{{ serviceRef.name }}</strong></a>
         </div>
-    </div>
-
-    <!-- Actions: -->
-    <div>
-        <div v-for="action in actions">{{ action }}</div>
     </div>
 </template>

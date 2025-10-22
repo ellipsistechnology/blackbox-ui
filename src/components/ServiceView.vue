@@ -7,14 +7,21 @@ const props = defineProps<{
     showObjects?: boolean
 }>()
 
-const emit = defineEmits(['selectObject', 'newObject'])
+const emit = defineEmits([
+    'selectObject', 
+    'newObject',
+    'info',
+    'error',
+    'objectDeleted'
+])
 
 const objects = ref<ObjectReference[]>([])
+const checkedObjects = ref<boolean[]>([])
 const values = ref<any[]>([])
 const actions = ref<string[]>([])
 
-async function loadValues(show: boolean) {
-    if(!show) {
+async function loadValues() {
+    if(!props.showObjects) {
         objects.value = []
         values.value = []
         return
@@ -33,12 +40,13 @@ async function loadValues(show: boolean) {
 }
 
 onMounted(async () => {
-    await loadValues(props.showObjects)
+    await loadValues()
     actions.value = await props.serviceNode.getActions()
+    checkedObjects.value = new Array(objects.value.length).fill(false)
 })
 
-watch(() => props.showObjects, async (show) => await loadValues(show))
-watch(() => props.serviceNode, async (_) => await loadValues(props.showObjects))
+watch(() => props.showObjects, async (show) => await loadValues())
+watch(() => props.serviceNode, async (_) => await loadValues())
 
 async function selectObject(obj: ObjectReference) {
     const objectNode = await obj.getObjectNode()
@@ -47,6 +55,27 @@ async function selectObject(obj: ObjectReference) {
 
 function createObject() {
     emit('newObject')
+}
+
+// TODO: prompt for confirmation
+async function deleteObjects() {
+    for(let index = objects.value.length - 1; index >= 0; index--) {
+        if(checkedObjects.value[index]) {
+            try {
+                const objNode = await objects.value[index]!.getObjectNode()
+                await objNode.deleteObject()
+                emit('info', `Object deleted successfully.`)
+                emit('objectDeleted', objNode)
+            } catch(err: any) {
+                emit('error', `Error deleting object: ${err.message || err}`)
+                console.error(`Error deleting object: `, err)
+            }
+        }
+    }
+
+    // Reload the objects list:
+    await loadValues()
+    checkedObjects.value = new Array(objects.value.length).fill(false)
 }
 </script>
 
@@ -68,10 +97,20 @@ function createObject() {
             <!-- Toolbar: -->
             <div class="d-flex flex-row justify-content-between mb-1 bg-dark">
                 <div>
-                    <button @click="createObject()" class="btn border-0">
+                    <button v-if="serviceNode.service.access !== 'unique'" @click="createObject()" class="btn border-0">
                         <i class="bi bi-plus-lg"></i>
                     </button>
-                    <button class="btn border-0 disabled"><i class="bi bi-trash3"></i></button>
+                    <button
+                        v-if="serviceNode.service.access !== 'unique'"
+                        class="btn border-0" 
+                        :class="{ 
+                            disabled: !checkedObjects.includes(true),
+                            'text-danger': checkedObjects.includes(true)
+                        }"
+                        @click="deleteObjects()"
+                    >
+                        <i class="bi bi-trash3"></i>
+                    </button>
                 </div>
                 <div>
                     <button class="btn border-0 disabled"><i class="bi bi-table"></i></button>
@@ -81,9 +120,9 @@ function createObject() {
 
             <!-- Objects: -->
             <div class="list-group list-group-flush">
-                <a v-for="obj in objects" 
+                <a v-for="(obj, index) in objects" 
                     href="#" 
-                    class="list-group-item list-group-item-action"
+                    class="list-group-item list-group-item-action d-flex flex-row"
                     @click="selectObject(obj)"
                 >
                     <div v-if="typeof obj.props == 'object'">
@@ -92,8 +131,18 @@ function createObject() {
                             &nbsp;- {{ (<any>v)[1] }}
                         </div>
                     </div>
-                    <span v-else-if="obj.error" class="text-danger">{{ obj.error?.error || obj.error?.message || obj.error }}</span>
-                    <span v-else>{{ obj.props }}</span>
+                    <div v-else-if="obj.error" class="text-danger">{{ obj.error?.error || obj.error?.message || obj.error }}</div>
+                    <div v-else>{{ obj.props }}</div>
+                    <button v-if="serviceNode.service.access !== 'unique'" class="ms-auto btn border-0 disabled"><i class="bi bi-grip-horizontal"></i></button>
+                    <div v-if="serviceNode.service.access !== 'unique'" class="d-flex align-items-center">
+                        <input 
+                            class="form-check-input mt-0" 
+                            type="checkbox" 
+                            v-model="checkedObjects[index]" 
+                            aria-label="Checkbox for following text input" 
+                            onclick="event.stopPropagation();"
+                        >
+                    </div>
                 </a>
             </div>
         </div>

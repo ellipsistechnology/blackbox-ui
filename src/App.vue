@@ -246,6 +246,8 @@ function newObject() {
                 :serviceNode="selectedNode as ServiceNode"
                 @select-object="objectNode => setNode('object', objectNode, false)"
                 @new-object="newObject()"
+                @info="message => showToast('info', message)"
+                @error="message => showToast('error', message)"
               ></ServiceView>
 
               <ObjectView 

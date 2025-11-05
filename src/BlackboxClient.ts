@@ -16,22 +16,25 @@ async function getServiceList(url: string | URL): Promise<ServiceReference[]> {
         url = new URL(url)
     }
     
-    try {
-        const response = await fetch(url)
-        const data = await response.json()
-        if(!data.services || !Array.isArray(data.services)) {
-            console.log(`No services array found in response from ${url}: `, data)
-            return []
-        }
-        return data.services.map((s: any) => new ServiceReference(new URL(s.href, url), s.name))
-    } catch (err) {
-        console.error(`Error fetching service list from ${url}: `, err)
+    const response = await fetch(url)
+    if(!response.ok) {
+        console.error(`Error fetching service list from ${url}: ${response.status} `, await response.json())
         return []
     }
+    const data = await response.json()
+    if(!data.services || !Array.isArray(data.services)) {
+        console.log(`No services array found in response from ${url}: `, data)
+        return []
+    }
+    return data.services.map((s: any) => new ServiceReference(new URL(s.href, url), s.name))
 }
 
 async function getActions(url: URL): Promise<Action[]> {
     const response = await fetch(url, {method: 'OPTIONS'})
+    if(!response.ok) {
+        console.error(`Error fetching actions from ${url}: ${response.status} `, await response.json())
+        return []
+    }
     const options = response.headers.get('allow')
     if(options) {
         return options.split(',')
@@ -65,6 +68,9 @@ export class ServiceReference {
         serviceUrl.searchParams.set('meta', '')
 
         const response = await fetch(serviceUrl)
+        if(!response.ok) {
+            throw new Error(`Error fetching service metadata from ${serviceUrl}: ${response.status} ${JSON.stringify(await response.json())}`)
+        }
         const data = await response.json() as Service
         data.url = this.url
 
@@ -80,8 +86,12 @@ export class ServiceNode {
      * service's access is unique.
      */
     async getObjects(): Promise<ObjectReference[]> {
-        const props = await fetch(this.service.url)
-        const data = await props.json()
+        const response = await fetch(this.service.url)
+        if(!response.ok) {
+            console.error(`Error fetching objects from ${this.service.url}: ${response.status} `, await response.json())
+            return []
+        }
+        const data = await response.json()
         
         if(this.service.access === 'unique') {
             // Get the single object:
@@ -140,16 +150,20 @@ export class ObjectReference {
         
         // Get the metadata if available:
         let metadata: any
-        try {
-            const metaUrl = new URL(this.url!)
-            metaUrl.searchParams.set('meta', '')
-            const meta = await fetch(metaUrl)
-            metadata = await meta.json()
-        } catch (err) {
-            console.error(`Could not fetch metadata for object at ${this.url}: `, err)
+        const metaUrl = new URL(this.url!)
+        metaUrl.searchParams.set('meta', '')
+        let response = await fetch(metaUrl)
+        let metatdata
+        if(!response.ok) {
+            metadata = await response.json()
+            console.error(`Could not fetch metadata for object from ${metaUrl}: ${response.status} `, metadata)
         }
 
-        const response = await fetch(this.url)
+        // Get the full object:
+        response = await fetch(this.url)
+        if(!response.ok) {
+            throw new Error(`Error fetching object from ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
+        }
         const data = await response.json()
         return new ObjectNode(this.url, this.service, data, metadata)
     }
@@ -178,36 +192,48 @@ export class ObjectNode {
     }
 
     async deleteObject(): Promise<void> {
-        await fetch(this.url, {method: 'DELETE'})
+        const response = await fetch(this.url, {method: 'DELETE'})
+        if(!response.ok) {
+            throw new Error(`Error deleting object at ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
+        }
     }
     
     async update(): Promise<void> {
-        await fetch(this.url, {
+        const response = await fetch(this.url, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(this.object)
         })
+        if(!response.ok) {
+            throw new Error(`Error updating object at ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
+        }
     }
 
     async replace(): Promise<void> {
-        await fetch(this.url, {
+        const response = await fetch(this.url, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(this.object)
         })
+        if(!response.ok) {
+            throw new Error(`Error replacing object at ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
+        }
     }
 
     async create(): Promise<void> {
-        await fetch(this.service.url, {
+        const response = await fetch(this.service.url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(this.object)
         })
+        if(!response.ok) {
+            throw new Error(`Error creating object at ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
+        }
     }
 }

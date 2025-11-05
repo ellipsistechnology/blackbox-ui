@@ -76,14 +76,27 @@ async function save() {
         actions.value.includes('replace') ? 'replace' 
         : null
     if(!method) {
-        console.error(`Cannot save object: The required create, update or replace action is available`)
-        emit('error', `Cannot save object: The required create, update or replace action is available.`)
+        const msg  =`Cannot save object: The required create, update or replace action is not available.`
+        console.error(msg)
+        emit('error', msg)
         return
+    }
+
+    // Parse any fields that should be numbers:
+    if(objectSchema.value && objectSchema.value.type === 'object' && objectSchema.value.properties) {
+        for(const [key, propSchema] of Object.entries(objectSchema.value.properties)) {
+            if(propSchema.type === 'number' && typeof props.objectNode.object[key] === 'string') {
+                const parsed = parseFloat(props.objectNode.object[key])
+                if(!isNaN(parsed)) {
+                    props.objectNode.object[key] = parsed
+                }
+            }
+        }
     }
 
     // Save the object via the API:
     try {
-        props.objectNode[method]()
+        await props.objectNode[method]()
     } catch (err) {
         console.error(`Error saving object: `, err)
         emit('error', `Failed to save ${props.objectNode.service.name}.`)
@@ -92,10 +105,7 @@ async function save() {
 
     // If changing the object's identifier then update URLs:
     if(props.objectNode.service.access === 'id') {
-        const identifier = props.objectNode.service.identifier
-        if(!identifier) {
-            throw new Error(`Service has no identifier defined.`)
-        }
+        const identifier = props.objectNode.service.identifier || 'id'
 
         // Emit URL change to app:
         const id = props.objectNode.object[identifier]
@@ -111,6 +121,8 @@ async function save() {
         // Update the object's URL:
         props.objectNode.url = new URL(newURL)
     }
+
+    editing.value = false
 
     // Exit new mode:
     emit('objectSaved', props.objectNode)    
@@ -158,7 +170,7 @@ async function deleteObject() {
             <button 
                 v-if="isNew || editing && (actions.includes('update') || actions.includes('replace'))" 
                 class="btn border-0"
-                @click="editing = false; save()"
+                @click="save()"
             >
                 <i class="bi bi-floppy"></i>
             </button>

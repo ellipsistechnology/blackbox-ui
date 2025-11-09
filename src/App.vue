@@ -259,6 +259,8 @@ function newObject() {
                 @url-changed="urlChanged"
                 @object-deleted="deleteObject"
                 @object-saved="isNewObject = false"
+                @select-object="objectNode => setNode('object', objectNode, false)"
+                @new-object="newObject()"
                 :is-new="isNewObject"
               ></ObjectView>
 

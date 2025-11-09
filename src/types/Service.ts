@@ -1,6 +1,8 @@
 import type Oas3schema from "./Oas3schema";
 
 export default class Service {
+  [key: string]: any // metadata
+
   constructor(
     public name: string,
     public url: URL,

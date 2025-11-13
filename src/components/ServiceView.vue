@@ -15,20 +15,22 @@ const emit = defineEmits([
     'objectDeleted'
 ])
 
-const objects = ref<ObjectReference[]>([])
+const objectRefs = ref<ObjectReference[]>([])
 const checkedObjects = ref<boolean[]>([])
 const values = ref<any[]>([])
 const actions = ref<string[]>([])
 
 async function loadValues() {
+    // If not showing objects, clear the list:
     if(!props.showObjects) {
-        objects.value = []
+        objectRefs.value = []
         values.value = []
         return
     }
 
-    objects.value = await props.serviceNode.getObjects()
-    values.value = objects.value.reduce((acc: any[], curr: ObjectReference) => {
+    // Load the objects for this service:
+    objectRefs.value = await props.serviceNode.getObjects()
+    values.value = objectRefs.value.reduce((acc: any[], curr: ObjectReference) => {
         if(typeof curr.props !== 'object') {
             acc.push(curr.props)
         } else {
@@ -37,12 +39,51 @@ async function loadValues() {
         
         return acc
     }, [])
+
+    // If uing a custom UI, manage messages:
+    if(props.serviceNode.service.ui?.['service-view']?.href) {
+        const iframe = document.getElementById('service-view-iframe') as HTMLIFrameElement
+        if(iframe && iframe.contentWindow) {
+            setTimeout(() => {
+                // Send the service and objects to the iframe:
+                const msg = {
+                    type: 'set-service',
+                    service: JSON.parse(JSON.stringify(props.serviceNode.service)),
+                    objectRefs: objectRefs.value.map(obj => JSON.parse(JSON.stringify(obj)))
+                }
+                iframe.contentWindow?.postMessage(msg, '*')
+
+                // Listen for messages from the iframe:
+                window.addEventListener('message', async (event) => {
+                    if(event.source !== iframe.contentWindow) return
+                    if(event.data.type === 'select-object') {
+                        // const objIndex = event.data.objectIndex
+                        // selectObject(objects.value[objIndex])
+                    } else if(event.data.type === 'new-object') {
+                        // createObject()
+                    } else if(event.data.type === 'delete-objects') {
+                        // deleteObjects()
+                    } else if(event.data.type === 'info' || event.data.type === 'error') {
+                        emit(event.data.type, event.data.message)
+                    } else if(event.data.type === 'get-objects') {
+                        const msg = {
+                            type: 'set-objects',
+                            objects: await Promise.all(
+                                objectRefs.value.map(async obj => JSON.parse(JSON.stringify(await obj.getObjectNode())))
+                            )
+                        }
+                        iframe.contentWindow?.postMessage(msg, '*')
+                    }
+                })
+            }, 100)
+        }
+    }
 }
 
 onMounted(async () => {
     await loadValues()
     actions.value = await props.serviceNode.getActions()
-    checkedObjects.value = new Array(objects.value.length).fill(false)
+    checkedObjects.value = new Array(objectRefs.value.length).fill(false)
 })
 
 watch(() => props.showObjects, async (show) => await loadValues())
@@ -59,10 +100,10 @@ function createObject() {
 
 // TODO: prompt for confirmation
 async function deleteObjects() {
-    for(let index = objects.value.length - 1; index >= 0; index--) {
+    for(let index = objectRefs.value.length - 1; index >= 0; index--) {
         if(checkedObjects.value[index]) {
             try {
-                const objNode = await objects.value[index]!.getObjectNode()
+                const objNode = await objectRefs.value[index]!.getObjectNode()
                 await objNode.deleteObject()
                 emit('info', `Object deleted successfully.`)
                 emit('objectDeleted', objNode)
@@ -75,12 +116,22 @@ async function deleteObjects() {
 
     // Reload the objects list:
     await loadValues()
-    checkedObjects.value = new Array(objects.value.length).fill(false)
+    checkedObjects.value = new Array(objectRefs.value.length).fill(false)
 }
 </script>
 
 <template>
-    <div class="ps-2 pe-2">
+    <!-- Custom UI: -->
+    <div v-if="serviceNode.service.ui?.['service-view']?.href" class="d-flex flex-column h-100">
+        <iframe 
+            id="service-view-iframe"
+            :src="serviceNode.service.ui?.['service-view'].href" 
+            class="w-100 h-100 border-0 flex-grow-1"
+        ></iframe>
+    </div>
+
+    <!-- Standard UI: -->
+    <div v-else class="ps-2 pe-2">
         <!-- Service details: -->
         <div class="d-flex flex-row mb-1">
             <div class="border-end border-dark pe-3 me-3">
@@ -120,7 +171,7 @@ async function deleteObjects() {
 
             <!-- Objects: -->
             <div class="list-group list-group-flush">
-                <a v-for="(obj, index) in objects" 
+                <a v-for="(obj, index) in objectRefs" 
                     href="#" 
                     class="list-group-item list-group-item-action d-flex flex-row"
                     @click="selectObject(obj)"

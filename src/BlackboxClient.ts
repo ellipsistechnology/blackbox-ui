@@ -153,7 +153,6 @@ export class ObjectReference {
         const metaUrl = new URL(this.url!)
         metaUrl.searchParams.set('meta', '')
         let response = await fetch(metaUrl)
-        let metatdata
         if(!response.ok) {
             metadata = await response.json()
             console.error(`Could not fetch metadata for object from ${metaUrl}: ${response.status} `, metadata)

@@ -3,11 +3,11 @@ import { defineEmits, ref } from 'vue'
 import CollapsableList from './CollapsableList.vue'
 import { RootNode, ServiceReference } from '@/BlackboxClient'
 
-const emit = defineEmits(['selectServer', 'selectService'])
+const emit = defineEmits(['selectServer', 'selectService', 'error'])
 
 const servers = ref([
     { url: 'http://localhost:3000' },
-    { url: 'http://localhost:3001' }
+    { url: 'http://localhost:3300' }
 ])
 const services = ref<ServiceReference[]>([])
 
@@ -22,14 +22,17 @@ async function selectService(service: ServiceReference) {
 function loadServices() {
     services.value = []
     servers.value.forEach(async s => {
-        // const serviceList = await new BlackboxClient(s.url).listServices()
-        const serviceList = await new RootNode(s.url).getServiceList() // TODO: Error handling
-        
-        serviceList.forEach(async serviceRef => {
-            // const serviceRef = await serviceRef.getServiceRefserviceRef()
-            // services.value.push(serviceRef)
-            services.value.push(serviceRef)
-        })
+        try {
+            const serviceList = await new RootNode(s.url).getServiceList() // TODO: Error handling
+            serviceList.forEach(async serviceRef => {
+                // const serviceRef = await serviceRef.getServiceRefserviceRef()
+                // services.value.push(serviceRef)
+                services.value.push(serviceRef)
+            })
+        } catch (e) {
+            console.error(e)
+            emit('error', `Error loading services from ${s.url}: ${e}`)
+        }
     })
 }
 

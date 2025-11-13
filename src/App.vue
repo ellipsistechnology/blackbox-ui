@@ -203,67 +203,69 @@ function newObject() {
             ></Sidebar>
           </template>
           <template #right>
-            <!-- Breadcrumbs nav: -->
-            <nav class="d-flex flex-row m-2 p-1 ps-2">
-              <ol class="breadcrumb m-0 bg-transparent">
-                <li v-for="(crumb, index) in breadcrumbs" class="breadcrumb-item" :class="index === breadcrumbs.length-1 ? 'active' : ''">
-                  <a v-if="index !== breadcrumbs.length-1" href="#" @click="jumpToBreadcrumb(index)" class="text-decoration-none">{{crumb.label}}</a>
-                  <span v-else>{{crumb.label}}</span>
-                </li>
-              </ol>
+            <div class="h-100 d-flex flex-column">
+              <!-- Breadcrumbs nav: -->
+              <nav class="d-flex flex-row m-2 p-1 ps-2">
+                <ol class="breadcrumb m-0 bg-transparent">
+                  <li v-for="(crumb, index) in breadcrumbs" class="breadcrumb-item" :class="index === breadcrumbs.length-1 ? 'active' : ''">
+                    <a v-if="index !== breadcrumbs.length-1" href="#" @click="jumpToBreadcrumb(index)" class="text-decoration-none">{{crumb.label}}</a>
+                    <span v-else>{{crumb.label}}</span>
+                  </li>
+                </ol>
 
-              <!-- Copy URL to clipboard. -->
-              <!-- Uses a popover based on the #popove-content div below. -->
-              <!-- Once copied to clipboard will show the toast below that. -->
-              <div :class="breadcrumbs.length > 0 ? '' : 'd-none'" class="ms-auto">
-                  <button type="button" class="btn border-0 p-0 pe-1" data-bs-toggle="popover">
-                      <i class="bi bi-link-45deg"></i>
-                  </button>
+                <!-- Copy URL to clipboard. -->
+                <!-- Uses a popover based on the #popove-content div below. -->
+                <!-- Once copied to clipboard will show the toast below that. -->
+                <div :class="breadcrumbs.length > 0 ? '' : 'd-none'" class="ms-auto">
+                    <button type="button" class="btn border-0 p-0 pe-1" data-bs-toggle="popover">
+                        <i class="bi bi-link-45deg"></i>
+                    </button>
+                </div>
+                <div class="d-none">
+                    <div id="popover-content">
+                        <div class="d-flex flex-row">
+                            <div class="flex-shrink-1 overflow-hidden text-truncate">{{breadcrumbs[breadcrumbs.length-1]?.url.toString()}}</div>
+                            <button class="ms-2 btn border-0 p-0 m-0" @click="copyToClipboard(breadcrumbs[breadcrumbs.length-1]?.url?.toString() || '')">
+                                <i class="bi bi-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+              </nav>
+
+              <!-- Main Body -->
+              <div class="flex-grow-1 overflow-auto">
+
+                <ServerSummary 
+                  v-if="selectedType === 'server'" 
+                  :rootNode="selectedNode as RootNode"
+                ></ServerSummary>
+
+                <ServiceView 
+                  v-else-if="selectedType === 'service'"
+                  :show-objects="true" 
+                  :serviceNode="selectedNode as ServiceNode"
+                  @select-object="objectNode => setNode('object', objectNode, false)"
+                  @new-object="newObject()"
+                  @info="message => showToast('info', message)"
+                  @error="message => showToast('error', message)"
+                ></ServiceView>
+
+                <ObjectView 
+                  v-else-if="selectedType === 'object'" 
+                  :objectNode="selectedNode as ObjectNode"
+                  @service-selected="serviceNode => setNode('service', serviceNode, false)"
+                  @info="message => showToast('info', message)"
+                  @error="message => showToast('error', message)"
+                  @url-changed="urlChanged"
+                  @object-deleted="deleteObject"
+                  @object-saved="isNewObject = false"
+                  @select-object="objectNode => setNode('object', objectNode, false)"
+                  @new-object="newObject()"
+                  :is-new="isNewObject"
+                ></ObjectView>
+
               </div>
-              <div class="d-none">
-                  <div id="popover-content">
-                      <div class="d-flex flex-row">
-                          <div class="flex-shrink-1 overflow-hidden text-truncate">{{breadcrumbs[breadcrumbs.length-1]?.url.toString()}}</div>
-                          <button class="ms-2 btn border-0 p-0 m-0" @click="copyToClipboard(breadcrumbs[breadcrumbs.length-1]?.url?.toString() || '')">
-                              <i class="bi bi-copy"></i>
-                          </button>
-                      </div>
-                  </div>
-              </div>
-            </nav>
-
-            <!-- Main Body -->
-            <div>
-
-              <ServerSummary 
-                v-if="selectedType === 'server'" 
-                :rootNode="selectedNode as RootNode"
-              ></ServerSummary>
-
-              <ServiceView 
-                v-else-if="selectedType === 'service'"
-                :show-objects="true" 
-                :serviceNode="selectedNode as ServiceNode"
-                @select-object="objectNode => setNode('object', objectNode, false)"
-                @new-object="newObject()"
-                @info="message => showToast('info', message)"
-                @error="message => showToast('error', message)"
-              ></ServiceView>
-
-              <ObjectView 
-                v-else-if="selectedType === 'object'" 
-                :objectNode="selectedNode as ObjectNode"
-                @service-selected="serviceNode => setNode('service', serviceNode, false)"
-                @info="message => showToast('info', message)"
-                @error="message => showToast('error', message)"
-                @url-changed="urlChanged"
-                @object-deleted="deleteObject"
-                @object-saved="isNewObject = false"
-                @select-object="objectNode => setNode('object', objectNode, false)"
-                @new-object="newObject()"
-                :is-new="isNewObject"
-              ></ObjectView>
-
             </div>
           </template>
         </SplitColumns>

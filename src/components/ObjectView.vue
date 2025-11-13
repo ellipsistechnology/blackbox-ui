@@ -3,6 +3,7 @@ import type { ObjectNode, ObjectReference, ServiceNode, ServiceReference } from 
 import type Oas3schema from '@/types/Oas3schema';
 import { onMounted, ref, watch } from 'vue';
 import ServiceView from './ServiceView.vue'
+import Properties from './Properties.vue';
 
 const props = defineProps<{
     objectNode: ObjectNode,
@@ -39,6 +40,7 @@ async function loadObject() {
 
     // Resolve relative schema hrefs to absolute URLs:
     const schema = props.objectNode?.service.type?.schema as {href: string}
+    
     if(schema?.href) {
         let url
         if(!(schema.href.startsWith('http://') || schema.href.startsWith('https://'))) {
@@ -172,100 +174,95 @@ async function selectObject(objectNode: ObjectNode) {
 </script>
 
 <template>
-    <!-- Tabs: -->
-    <ul v-if="objectNode.service.ui?.['subservice-display'] === 'tabs'" class="nav nav-tabs">
-        <li class="nav-item">
-            <a 
-                class="nav-link" 
-                :class="selectedTab === 'summary' ? 'active' : ''" 
-                href="#"
-                @click="selectTab(null)"
-            >Summary</a>
-        </li>
-        <li v-for="service of servicelist" class="nav-item">
-            <a 
-                class="nav-link" 
-                href="#"
-                :class="selectedTab === service.name ? 'active' : ''"
-                @click="selectTab(service)"
-            >{{service.name.charAt(0).toUpperCase() + service.name.substring(1)}}</a>
-        </li>
-    </ul>
+    <div class="d-flex flex-column h-100">
+        <!-- Tabs: -->
+        <ul v-if="objectNode.service.ui?.['subservice-display'] === 'tabs'" class="nav nav-tabs">
+            <li class="nav-item">
+                <a 
+                    class="nav-link" 
+                    :class="selectedTab === 'summary' ? 'active' : ''" 
+                    href="#"
+                    @click="selectTab(null)"
+                >Summary</a>
+            </li>
+            <li v-for="service of servicelist" class="nav-item">
+                <a 
+                    class="nav-link" 
+                    href="#"
+                    :class="selectedTab === service.name ? 'active' : ''"
+                    @click="selectTab(service)"
+                >{{service.name.charAt(0).toUpperCase() + service.name.substring(1)}}</a>
+            </li>
+        </ul>
 
-    <div v-if="selectedTab === 'summary'">
-        <!-- Toolbar: -->
-        <div class="d-flex flex-row justify-content-between mb-1 bg-dark">
-            <div>
-                <button 
-                    v-if="!isNew && !editing && (actions.includes('update') || actions.includes('replace'))" 
-                    class="btn border-0"
-                    @click="editing = true"
-                >
-                    <i class="bi bi-pencil-square"></i>
-                </button>
-                <button 
-                    v-if="!isNew && !editing && actions.includes('delete')" 
-                    class="btn border-0"
-                    @click="deleteObject()"
-                >
-                    <i class="bi bi-trash3"></i>
-                </button>
-                
-                <button 
-                    v-if="isNew || editing && (actions.includes('update') || actions.includes('replace'))" 
-                    class="btn border-0"
-                    @click="save()"
-                >
-                    <i class="bi bi-floppy"></i>
-                </button>
-                <button 
-                    v-if="editing && !isNew" 
-                    class="btn border-0"
-                    @click="editing = false; revert()"
-                >
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Object properties: -->
-        <form v-if="typeof objectNode.object === 'object' && objectSchema?.type === 'object'" class="ps-2 mt-2 border-top border-dark pt-2">
-            <div v-for="key in Object.keys(objectSchema.properties as object)" :key="key" class="row p-1">
-                <label class="col-sm-2 col-form-label col-form-label-sm text-end pe-2" :for="key">
-                    <strong>{{ key }}</strong>
-                </label>
-                <div class="col-sm-8 ps-1">
-                    <input 
-                        class="form-control-sm" 
-                        :readonly="!editing && !isNew" 
-                        :class="editing || isNew ? 'form-control' : 'form-control-plaintext'" 
-                        :id="key" 
-                        type="text" 
-                        v-model="objectNode.object[key]"
-                    ></input>
+        <!-- Summary Tab -->
+        <div v-if="selectedTab === 'summary'">
+            <!-- Toolbar: -->
+            <div class="d-flex flex-row justify-content-between mb-1 bg-dark">
+                <div>
+                    <button 
+                        v-if="!isNew && !editing && (actions.includes('update') || actions.includes('replace'))" 
+                        class="btn border-0"
+                        @click="editing = true"
+                    >
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <button 
+                        v-if="!isNew && !editing && actions.includes('delete')" 
+                        class="btn border-0"
+                        @click="deleteObject()"
+                    >
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                    
+                    <button 
+                        v-if="isNew || editing && (actions.includes('update') || actions.includes('replace'))" 
+                        class="btn border-0"
+                        @click="save()"
+                    >
+                        <i class="bi bi-floppy"></i>
+                    </button>
+                    <button 
+                        v-if="editing && !isNew" 
+                        class="btn border-0"
+                        @click="editing = false; revert()"
+                    >
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
             </div>
-        </form>
-        <div v-else class="ps-2">{{ objectNode.object }}</div>
-    </div>
 
-    <div v-for="serviceRef in servicelist">
-        <ServiceView
-            v-if="objectNode.service.ui?.['subservice-display'] === 'tabs' && selectedTab === serviceRef.name"
-            :show-objects="true" 
-            :serviceNode="selectedService as ServiceNode"
-            @select-object="objectNode => selectObject(objectNode)"
-            @new-object="emit('newObject')"
-            @info="message => emit('info', message)"
-            @error="message => emit('error', message)"
-        ></ServiceView>
-    </div>
+            <!-- Object properties: -->
+            <form v-if="objectSchema?.properties && typeof objectNode.object === 'object' && objectSchema?.type === 'object'" class="ps-2 mt-2 border-top border-dark pt-2">
+                {{ objectSchema.properties }}
+                <Properties 
+                    :properties="objectSchema.properties" 
+                    :editing="editing" 
+                    :isNew="isNew || false"
+                    v-model="objectNode.object"
+                ></Properties>
+            </form>
+            <div v-else class="ps-2">{{ objectNode.object }}</div>
+        </div>
 
-    <!-- Sub-service list: -->
-    <div v-if="servicelist && servicelist.length > 0 && objectNode.service.ui?.['subservice-display'] !== 'tabs'" class="ps-2 mt-2 border-top border-dark pt-2">
-        <h5>Services provided by this object:</h5>
-        <div v-for="serviceRef in servicelist" class="list-group list-group-flush">
-            <a href="#" @click="selectService(serviceRef)" class="list-group-item list-group-item-action ps-2 pe-2 pt-1 pb-1"><strong>{{ serviceRef.name }}</strong></a>
+        <!-- Sub-service Tabs: -->
+        <div v-else-if="objectNode.service.ui?.['subservice-display'] === 'tabs'" class="flex-grow-1">
+            <ServiceView
+                :show-objects="true" 
+                :serviceNode="selectedService as ServiceNode"
+                @select-object="objectNode => selectObject(objectNode)"
+                @new-object="emit('newObject')"
+                @info="message => emit('info', message)"
+                @error="message => emit('error', message)"
+            ></ServiceView>
+        </div>
+
+        <!-- Sub-service list: -->
+        <div v-else-if="servicelist && servicelist.length > 0" class="ps-2 mt-2 border-top border-dark pt-2 flex-grow-1">
+            <h5>Services provided by this object:</h5>
+            <div v-for="serviceRef in servicelist" class="list-group list-group-flush">
+                <a href="#" @click="selectService(serviceRef)" class="list-group-item list-group-item-action ps-2 pe-2 pt-1 pb-1"><strong>{{ serviceRef.name }}</strong></a>
+            </div>
         </div>
     </div>
 </template>

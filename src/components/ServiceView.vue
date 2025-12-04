@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ObjectReference, ServiceNode } from '@/BlackboxClient';
+import { ObjectNode, ObjectReference, ServiceNode } from '@/BlackboxClient';
 import { onMounted, ref, watch, defineEmits } from 'vue';
+import ObjectView from './ObjectView.vue';
 
 const props = defineProps<{
     serviceNode: ServiceNode,
@@ -16,6 +17,7 @@ const emit = defineEmits([
 ])
 
 const objectRefs = ref<ObjectReference[]>([])
+const uniqueObjectNode = ref<ObjectNode|null>(null)
 const checkedObjects = ref<boolean[]>([])
 const values = ref<any[]>([])
 const actions = ref<string[]>([])
@@ -55,7 +57,6 @@ async function loadValues() {
 
                 // Listen for messages from the iframe:
                 window.addEventListener('message', async (event) => {
-                    if(event.source !== iframe.contentWindow) return
                     if(event.data.type === 'select-object') {
                         // const objIndex = event.data.objectIndex
                         // selectObject(objects.value[objIndex])
@@ -63,6 +64,8 @@ async function loadValues() {
                         // createObject()
                     } else if(event.data.type === 'delete-objects') {
                         // deleteObjects()
+                    } else if(event.data.type === 'update-object') {
+                        updateObject(new ObjectReference(event.data.ref, props.serviceNode.service), event.data.object)
                     } else if(event.data.type === 'info' || event.data.type === 'error') {
                         emit(event.data.type, event.data.message)
                     } else if(event.data.type === 'get-objects') {
@@ -80,10 +83,31 @@ async function loadValues() {
     }
 }
 
+async function updateObject(ref: ObjectReference, obj: any) {
+    // Get current object ready for update:
+    const objNode = await ref.getObjectNode()
+
+    // Update only the provided fields:
+    for(const [key, value] of Object.entries(obj)) {
+        objNode.object[key] = value
+    }
+    await objNode.update()
+
+    // Reload the objects list:
+    loadValues()
+
+    emit('info', `Updated successfully.`)
+}
+
 onMounted(async () => {
     await loadValues()
     actions.value = await props.serviceNode.getActions()
     checkedObjects.value = new Array(objectRefs.value.length).fill(false)
+
+    // If unique access, load the single object node:
+    if(props.serviceNode.service.access === 'unique' && objectRefs.value.length > 0) {
+        uniqueObjectNode.value = await objectRefs.value[0]?.getObjectNode() as ObjectNode
+    }
 })
 
 watch(() => props.showObjects, async (show) => await loadValues())
@@ -131,7 +155,7 @@ async function deleteObjects() {
     </div>
 
     <!-- Standard UI: -->
-    <div v-else class="ps-2 pe-2">
+    <div v-else class="pe-2">
         <!-- Service details: -->
         <div class="d-flex flex-row mb-1">
             <div class="border-end border-dark pe-3 me-3">
@@ -170,7 +194,7 @@ async function deleteObjects() {
             </div>
 
             <!-- Objects: -->
-            <div class="list-group list-group-flush">
+            <div v-if="serviceNode.service.access !== 'unique'" class="list-group list-group-flush">
                 <a v-for="(obj, index) in objectRefs" 
                     href="#" 
                     class="list-group-item list-group-item-action d-flex flex-row"
@@ -195,6 +219,19 @@ async function deleteObjects() {
                         >
                     </div>
                 </a>
+            </div>
+            <div v-else>
+                <ObjectView
+                    v-if="uniqueObjectNode"
+                    :objectNode="uniqueObjectNode" 
+                    :showActions="true"
+                    @info="msg => emit('info', msg)"
+                    @error="msg => emit('error', msg)"
+                ></ObjectView>
+                <div v-else class="text-center text-muted mt-5">
+                    <i class="bi bi-info-circle-fill fs-1"></i>
+                    <div>No object available.</div>
+                </div>
             </div>
         </div>
     </div>

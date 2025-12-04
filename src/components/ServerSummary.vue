@@ -5,6 +5,10 @@ import { ref, watch } from 'vue'
 import ServiceView from './ServiceView.vue'
 import { RootNode, ServiceNode } from '@/BlackboxClient'
 
+const emit = defineEmits([
+    'selectService'
+])
+
 const serviceList = ref<ServiceNode[]|null>(null)
 
 const props = defineProps({
@@ -29,8 +33,9 @@ watch(() => props.rootNode, async (newRootNode) => {
 </script>
 
 <template>
-    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="mt-4 p-0">
+    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="mt-4 p-0 ps-2">
         <ServiceView :serviceNode="serviceNode"></ServiceView>
+        <button class="btn btn-outline-primary" @click="emit('selectService', serviceNode)">Open Service</button>
     </div>
     <div v-else>
         Loading from {{ rootNode?.url }}...

@@ -237,8 +237,9 @@ function newObject() {
               <div class="flex-grow-1 overflow-auto">
 
                 <ServerSummary 
-                  v-if="selectedType === 'server'" 
+                  v-if="selectedType === 'server'"
                   :rootNode="selectedNode as RootNode"
+                  @select-service="(serviceNode: ServiceNode) => setNode('service', serviceNode, false)"
                 ></ServerSummary>
 
                 <ServiceView 

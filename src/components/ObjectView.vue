@@ -208,11 +208,11 @@ async function selectObject(objectNode: ObjectNode) {
             </div>
 
             <!-- Object properties: -->
-            <form v-if="objectSchema?.properties && typeof objectNode.object === 'object' && objectSchema?.type === 'object'" class="ps-2 mt-2 border-top border-dark pt-2">
+            <form v-if="objectSchema && typeof objectNode.object === 'object' && objectSchema?.type === 'object'" class="ps-2 mt-2 border-top border-dark pt-2">
                 <Properties
                     v-if="parentServiceNode"
                     :serviceNode="parentServiceNode"
-                    :properties="objectSchema.properties"
+                    :schema="objectSchema"
                     :editing="editing"
                     :isNew="isNew || false"
                     v-model="objectNode.object"

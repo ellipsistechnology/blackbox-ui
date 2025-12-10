@@ -145,6 +145,7 @@ async function deleteObjects() {
 </script>
 
 <template>
+    {{ serviceNode.service.ui }}
     <!-- Custom UI: -->
     <div v-if="serviceNode.service.ui?.['service-view']?.href" class="d-flex flex-column h-100">
         <iframe 

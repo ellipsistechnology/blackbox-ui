@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { ObjectNode, ObjectReference, ServiceNode, ServiceReference } from '@/BlackboxClient';
+import type { ObjectNode, ObjectReference, ServiceReference } from '@/BlackboxClient';
+import { ServiceNode } from '@/BlackboxClient';
 import type Oas3schema from '@/types/Oas3schema';
 import { onMounted, ref, watch } from 'vue';
 import ServiceView from './ServiceView.vue'
@@ -28,6 +29,7 @@ const editing = ref<boolean>(false)
 const originalObject = ref<any>(null)
 const selectedTab = ref<string>('summary')
 const selectedService = ref<ServiceNode|null>(null)
+const parentServiceNode = ref<ServiceNode|null>(null)
 
 onMounted(loadObject)
 watch(() => props.objectNode, loadObject)
@@ -39,35 +41,8 @@ async function loadObject() {
     originalObject.value = JSON.parse(JSON.stringify(props.objectNode.object))
 
     // Resolve relative schema hrefs to absolute URLs:
-    const schema = props.objectNode?.service.type?.schema as {href: string}
-    
-    if(schema?.href) {
-        let url
-        if(!(schema.href.startsWith('http://') || schema.href.startsWith('https://'))) {
-            url = new URL(schema.href, props.objectNode.service.url)
-        } else {
-            url = new URL(schema.href)
-        }
-        const response = await fetch(url)
-        const data = await response.json()
-
-        // Get the path after # from the href 
-        // and replace the reference with the schema:
-        const hashIndex = url.hash.indexOf('#/')
-        if(hashIndex >= 0) {
-            const path = url.hash.substring(hashIndex + 2).split('/')
-            let subdoc: any = data
-            for(const p of path) {
-                subdoc = subdoc[p]
-            }
-            props.objectNode.service.type!.schema = subdoc
-            objectSchema.value = subdoc
-        } else {
-            console.error(`Could not find path '${url.hash}' at '${url.toString()}'`)
-        }
-    } else {
-        objectSchema.value = props.objectNode?.service.type?.schema as Oas3schema | undefined
-    }
+    parentServiceNode.value = new ServiceNode(props.objectNode.service)
+    objectSchema.value = await parentServiceNode.value.resolveSchema()
 }
 
 async function selectService(serviceRef: ServiceReference) {
@@ -234,13 +209,15 @@ async function selectObject(objectNode: ObjectNode) {
 
             <!-- Object properties: -->
             <form v-if="objectSchema?.properties && typeof objectNode.object === 'object' && objectSchema?.type === 'object'" class="ps-2 mt-2 border-top border-dark pt-2">
-                {{ objectSchema.properties }}
-                <Properties 
-                    :properties="objectSchema.properties" 
-                    :editing="editing" 
+                <Properties
+                    v-if="parentServiceNode"
+                    :serviceNode="parentServiceNode"
+                    :properties="objectSchema.properties"
+                    :editing="editing"
                     :isNew="isNew || false"
                     v-model="objectNode.object"
                 ></Properties>
+                <div v-else class="p-2">Loading summary...</div>
             </form>
             <div v-else class="ps-2">{{ objectNode.object }}</div>
         </div>
@@ -248,7 +225,7 @@ async function selectObject(objectNode: ObjectNode) {
         <!-- Sub-service Tabs: -->
         <div v-else-if="objectNode.service.ui?.['subservice-display'] === 'tabs'" class="flex-grow-1">
             <ServiceView
-                :show-objects="true" 
+                :showObjects="true" 
                 :serviceNode="selectedService as ServiceNode"
                 @select-object="objectNode => selectObject(objectNode)"
                 @new-object="emit('newObject')"

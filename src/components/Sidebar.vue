@@ -98,18 +98,18 @@ function focusServerName() {
                     <a v-for="server in localServers"
                         @click="selectServer(server)" 
                         href="#"
-                        class="list-group-item list-group-item-action p-0 ps-2 pe-2 border-0"
+                        class="list-group-item list-group-item-action p-0 pe-2 border-0"
                     >
                         {{ server.name || server.url }}
                     </a>
                     <a v-for="server in remoteServers"
                         @click="selectServer(server)" 
                         href="#"
-                        class="list-group-item list-group-item-action p-0 ps-2 pe-2 border-0"
+                        class="list-group-item list-group-item-action p-0 pe-2 border-0"
                     >
                         {{ server.name || server.url }}
                     </a>
-                    <div class="list-group-item list-group-item-action p-0 ps-2 pe-2 border-0">
+                    <div class="list-group-item list-group-item-action p-0 pe-2 border-0">
                         <input 
                             type="text" 
                             class="form-control border-0 p-0 bg-transparent" 
@@ -134,7 +134,7 @@ function focusServerName() {
                     <a v-for="serviceRef in services"
                         href="#" 
                         @click="selectService(serviceRef)"
-                        class="list-group-item list-group-item-action p-0 ps-2 pe-2 border-0"
+                        class="list-group-item list-group-item-action p-0 pe-2 border-0"
                     >
                         {{ serviceRef.name }}
                     </a>

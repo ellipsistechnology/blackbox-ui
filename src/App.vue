@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {BApp} from 'bootstrap-vue-next'
-import 'bootstrap/dist/js/bootstrap.bundle.min.js'
+// import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import Menu from './components/Menu.vue'
 import Sidebar from './components/Sidebar.vue'
 import { onMounted, ref, watch } from 'vue'
@@ -21,7 +21,7 @@ interface Breadcrumb {
     url: URL
 }
 
-const showSidebar = ref(false)
+const showSidebar = ref(true)
 const selectedType = ref<NodeType | null>(null)
 const selectedNode = ref<Node | null>(null)
 const breadcrumbs = ref<Breadcrumb[]>([])

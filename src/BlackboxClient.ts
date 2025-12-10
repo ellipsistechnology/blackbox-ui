@@ -1,3 +1,4 @@
+import type Oas3schema from './types/Oas3schema.js'
 import Service from './types/Service.js'
 
 export type Action = 'get' | 'add' | 'replace' | 'delete' | 'update'
@@ -79,6 +80,8 @@ export class ServiceReference {
 }
 
 export class ServiceNode {
+    oasDoc: any // OpenAPI document for resolving $ref references.
+
     constructor(public service: Service) {}
 
     /**
@@ -118,7 +121,8 @@ export class ServiceNode {
     }
 
     /**
-     * 
+     * Get a list of subservices.
+     * Only valid for services with unique access.
      * @returns 
      */
     async getServiceList(): Promise<ServiceReference[]> {
@@ -132,6 +136,85 @@ export class ServiceNode {
 
     async getActions(): Promise<Action[]> {
         return await getActions(this.service.url)
+    }
+
+    /**
+     * Retrieves the schema from the server and resolves the href if the schema is not yet loaded.
+     * @returns 
+     */
+    async resolveSchema(): Promise<Oas3schema | undefined> {
+        const schema = this.service.type?.schema as {href: string}
+    
+        if(schema?.href) {
+            let url
+            if(!(schema.href.startsWith('http://') || schema.href.startsWith('https://'))) {
+                url = new URL(schema.href, this.service.url)
+            } else {
+                url = new URL(schema.href)
+            }
+            const response = await fetch(url)
+            this.oasDoc = await response.json() // Open API document.
+
+            // Get the path after # from the href 
+            // and replace the reference with the schema:
+            const hashIndex = url.hash.indexOf('#/')
+            if(hashIndex >= 0) {
+                const path = url.hash.substring(hashIndex + 2).split('/')
+                let subdoc: any = this.oasDoc
+                for(const p of path) {
+                    subdoc = subdoc[p]
+                }
+                // Object.values(subdoc).forEach((value) => this.resolveRefs(value))
+                this.service.type!.schema = subdoc
+                return subdoc
+            } else {
+                console.error(`Could not find path '${url.hash}' at '${url.toString()}'`)
+            }
+        } else {
+            return this.service.type?.schema as Oas3schema | undefined
+        }
+    }
+
+    /**
+     * Resolves any $ref references in the given schema object. 
+     * This is not recursive since schema definitions may include loops.
+     * @param schema 
+     * @returns 
+     */
+    resolveRefs(schema: any) {
+        if(typeof schema !== 'object' || schema === null) {
+            return
+        }
+
+        // Replace reference children with lazily-loaded schemas:
+        if(schema['$ref'] && typeof schema['$ref'] === 'string') {
+            const refPath = schema['$ref']
+            if(refPath.startsWith('#/')) {
+                // Get schema from path:
+                const pathParts = refPath.substring(2).split('/')
+                let subdoc: any = this.oasDoc
+                for(const p of pathParts) {
+                    subdoc = subdoc[p]
+                }
+
+                // Replace reference with schema:
+                Object.assign(schema, subdoc)
+                schema['$ref'] = undefined
+
+                // Replace any child references with a lazy getter:
+                // Object.entries(schema.properties).forEach(([key, value]) => {
+                //     if((<any>value)['$ref']) {
+                //         Object.defineProperty(schema.properties, key, {
+                //             get: () => {
+                //                 this.resolveRefs(value)
+                //                 Object.defineProperty(schema.properties, key, <any>value)
+                //                 return value
+                //             }
+                //         })
+                //     }
+                // })
+            }
+        }
     }
 }
 

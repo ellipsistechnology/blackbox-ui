@@ -33,7 +33,7 @@ watch(() => props.rootNode, async (newRootNode) => {
 </script>
 
 <template>
-    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="mt-4 p-0 ps-2">
+    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="p-0">
         <ServiceView :serviceNode="serviceNode"></ServiceView>
         <button class="btn btn-outline-primary" @click="emit('selectService', serviceNode)">Open Service</button>
     </div>

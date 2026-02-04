@@ -234,37 +234,40 @@ function newObject() {
               </nav>
 
               <!-- Main Body -->
-              <div class="flex-grow-1 overflow-auto">
+              <div class="flex-grow-1 overflow-auto mt-4">
 
-                <ServerSummary 
-                  v-if="selectedType === 'server'"
-                  :rootNode="selectedNode as RootNode"
-                  @select-service="(serviceNode: ServiceNode) => setNode('service', serviceNode, false)"
-                ></ServerSummary>
+                <div class="ps-2 h-100">
+                  <ServerSummary 
+                    v-if="selectedType === 'server'"
+                    :rootNode="selectedNode as RootNode"
+                    @select-service="(serviceNode: ServiceNode) => setNode('service', serviceNode, false)"
+                  ></ServerSummary>
 
-                <ServiceView 
-                  v-else-if="selectedType === 'service'"
-                  :show-objects="true" 
-                  :serviceNode="selectedNode as ServiceNode"
-                  @select-object="objectNode => setNode('object', objectNode, false)"
-                  @new-object="newObject()"
-                  @info="message => showToast('info', message)"
-                  @error="message => showToast('error', message)"
-                ></ServiceView>
+                  <ServiceView 
+                    v-else-if="selectedType === 'service'"
+                    :show-objects="true" 
+                    :serviceNode="selectedNode as ServiceNode"
+                    @select-object="objectNode => setNode('object', objectNode, false)"
+                    @new-object="newObject()"
+                    @info="message => showToast('info', message)"
+                    @error="message => showToast('error', message)"
+                  ></ServiceView>
 
-                <ObjectView 
-                  v-else-if="selectedType === 'object'" 
-                  :objectNode="selectedNode as ObjectNode"
-                  @service-selected="serviceNode => setNode('service', serviceNode, false)"
-                  @info="message => showToast('info', message)"
-                  @error="message => showToast('error', message)"
-                  @url-changed="urlChanged"
-                  @object-deleted="deleteObject"
-                  @object-saved="isNewObject = false"
-                  @select-object="objectNode => setNode('object', objectNode, false)"
-                  @new-object="newObject()"
-                  :is-new="isNewObject"
-                ></ObjectView>
+                  <ObjectView 
+                    v-else-if="selectedType === 'object'" 
+                    :objectNode="selectedNode as ObjectNode"
+                    @service-selected="serviceNode => setNode('service', serviceNode, false)"
+                    @info="message => showToast('info', message)"
+                    @error="message => showToast('error', message)"
+                    @url-changed="urlChanged"
+                    @object-deleted="deleteObject"
+                    @object-saved="isNewObject = false"
+                    @select-object="objectNode => setNode('object', objectNode, false)"
+                    @new-object="newObject()"
+                    :is-new="isNewObject"
+                  ></ObjectView>
+
+                </div>
 
               </div>
             </div>

@@ -99,7 +99,7 @@ async function updateObject(ref: ObjectReference, obj: any) {
     emit('info', `Updated successfully.`)
 }
 
-onMounted(async () => {
+async function refreshNode() {
     await loadValues()
     actions.value = await props.serviceNode.getActions()
     checkedObjects.value = new Array(objectRefs.value.length).fill(false)
@@ -108,10 +108,17 @@ onMounted(async () => {
     if(props.serviceNode.service.access === 'unique' && objectRefs.value.length > 0) {
         uniqueObjectNode.value = await objectRefs.value[0]?.getObjectNode() as ObjectNode
     }
-})
+
+    // If auto-open is set, emit select for the first object:
+    if(props.serviceNode.service.ui?.['auto-open-single'] && objectRefs.value.length === 1 && objectRefs.value[0]) {
+        selectObject(objectRefs.value[0])
+    }
+}
+
+onMounted(refreshNode)
 
 watch(() => props.showObjects, async (show) => await loadValues())
-watch(() => props.serviceNode, async (_) => await loadValues())
+watch(() => props.serviceNode, async (_) => await refreshNode())
 
 async function selectObject(obj: ObjectReference) {
     const objectNode = await obj.getObjectNode()
@@ -156,7 +163,7 @@ async function deleteObjects() {
     </div>
 
     <!-- Standard UI: -->
-    <div v-else class="pe-2">
+    <div v-else class="pe-2 mb-3">
         <!-- Service details: -->
         <div class="d-flex flex-row mb-1">
             <div class="border-end border-dark pe-3 me-3">
@@ -229,9 +236,8 @@ async function deleteObjects() {
                     @info="msg => emit('info', msg)"
                     @error="msg => emit('error', msg)"
                 ></ObjectView>
-                <div v-else class="text-center text-muted mt-5">
-                    <i class="bi bi-info-circle-fill fs-1"></i>
-                    <div>No object available.</div>
+                <div v-else class="text-muted">
+                    <div>Loading...</div>
                 </div>
             </div>
         </div>

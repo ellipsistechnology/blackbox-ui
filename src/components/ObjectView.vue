@@ -19,7 +19,8 @@ const emit = defineEmits([
     'objectDeleted',
     'objectSaved',
     'newObject',
-    'selectObject'
+    'selectObject',
+    'closeObject'
 ])
 
 const servicelist = ref<ServiceReference[]>([])
@@ -55,7 +56,8 @@ async function save() {
     const method = 
         props.isNew ? 'create' :
         actions.value.includes('update') ? 'update' : 
-        actions.value.includes('replace') ? 'replace' 
+        actions.value.includes('replace') ? 'replace' :
+        actions.value.includes('add') && props.objectNode.service.access === 'unique' ? 'create'
         : null
     if(!method) {
         const msg  =`Cannot save object: The required create, update or replace action is not available.`
@@ -113,9 +115,15 @@ async function save() {
     emit('info', `Object saved successfully.`)
 }
 
-function revert() {
-    // Revert the object to the original state:
-    props.objectNode.object = JSON.parse(JSON.stringify(originalObject.value))
+function cancelEdit() {
+    editing.value = false
+
+    if(props.isNew) {
+        emit('closeObject')
+    } else {
+        // Revert the object to the original state:
+        props.objectNode.object = JSON.parse(JSON.stringify(originalObject.value))
+    }
 }
 
 // TODO: prompt for confirmation
@@ -149,7 +157,7 @@ async function selectObject(objectNode: ObjectNode) {
 </script>
 
 <template>
-    <div class="d-flex flex-column h-100">
+    <div class="d-flex flex-column h-100 mb-3">
         <!-- Tabs: -->
         <ul v-if="objectNode.service.ui?.['subservice-display'] === 'tabs'" class="nav nav-tabs">
             <li class="nav-item">
@@ -170,13 +178,15 @@ async function selectObject(objectNode: ObjectNode) {
             </li>
         </ul>
 
-        <!-- Summary Tab -->
+        <!-- Summary Tab OR not displayed as tabs -->
+        {{ objectNode.service.ui?.['subservice-display'] === 'tabs' ? 'tab='+selectedTab+'; ' : '' }}service={{ objectNode.service.name }}
         <div v-if="selectedTab === 'summary'">
             <!-- Toolbar: -->
+             {{actions}}
             <div class="d-flex flex-row justify-content-between mb-1 bg-dark">
                 <div>
                     <button 
-                        v-if="!isNew && !editing && (actions.includes('update') || actions.includes('replace'))" 
+                        v-if="!isNew && !editing && (actions.includes('update') || actions.includes('replace') || (actions.includes('add') && objectNode.service.access === 'unique'))" 
                         class="btn border-0"
                         @click="editing = true"
                     >
@@ -191,16 +201,16 @@ async function selectObject(objectNode: ObjectNode) {
                     </button>
                     
                     <button 
-                        v-if="isNew || editing && (actions.includes('update') || actions.includes('replace'))" 
+                        v-if="isNew || editing && (actions.includes('update') || actions.includes('replace') || (actions.includes('add') && objectNode.service.access === 'unique'))" 
                         class="btn border-0"
                         @click="save()"
                     >
                         <i class="bi bi-floppy"></i>
                     </button>
                     <button 
-                        v-if="editing && !isNew" 
+                        v-if="editing || isNew" 
                         class="btn border-0"
-                        @click="editing = false; revert()"
+                        @click="cancelEdit()"
                     >
                         <i class="bi bi-x-lg"></i>
                     </button>
@@ -208,7 +218,7 @@ async function selectObject(objectNode: ObjectNode) {
             </div>
 
             <!-- Object properties: -->
-            <form v-if="objectSchema && typeof objectNode.object === 'object' && objectSchema?.type === 'object'" class="ps-2 mt-2 border-top border-dark pt-2">
+            <form class="ps-2 mt-2 pt-2"> <!-- v-if="objectSchema && typeof objectNode.object === 'object' && objectSchema?.type === 'object'" -->
                 <Properties
                     v-if="parentServiceNode"
                     :serviceNode="parentServiceNode"
@@ -216,10 +226,13 @@ async function selectObject(objectNode: ObjectNode) {
                     :editing="editing"
                     :isNew="isNew || false"
                     v-model="objectNode.object"
+                    @save="save()"
                 ></Properties>
                 <div v-else class="p-2">Loading summary...</div>
             </form>
-            <div v-else class="ps-2">{{ objectNode.object }}</div>
+            <!-- <div v-else class="ps-2">
+                {{ objectNode.object }}
+            </div> -->
         </div>
 
         <!-- Sub-service Tabs: -->
@@ -235,7 +248,7 @@ async function selectObject(objectNode: ObjectNode) {
         </div>
 
         <!-- Sub-service list: -->
-        <div v-else-if="servicelist && servicelist.length > 0" class="ps-2 mt-2 border-top border-dark pt-2 flex-grow-1">
+        <div v-if="!isNew && servicelist && servicelist.length > 0" class="ps-2 mt-2 border-top border-dark pt-2 flex-grow-1">
             <h5>Services provided by this object:</h5>
             <div v-for="serviceRef in servicelist" class="list-group list-group-flush">
                 <a href="#" @click="selectService(serviceRef)" class="list-group-item list-group-item-action ps-2 pe-2 pt-1 pb-1"><strong>{{ serviceRef.name }}</strong></a>

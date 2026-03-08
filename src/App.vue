@@ -145,6 +145,10 @@ function urlChanged(oldUrl: string, newUrl: string) {
 }
 
 function deleteObject(_: ObjectNode) {
+  popBreadcrumb()
+}
+
+function popBreadcrumb() {
   // Go back to the service view:
   breadcrumbs.value.pop()
   const crumb = breadcrumbs.value[breadcrumbs.value.length - 1]
@@ -241,6 +245,7 @@ function newObject() {
                     v-if="selectedType === 'server'"
                     :rootNode="selectedNode as RootNode"
                     @select-service="(serviceNode: ServiceNode) => setNode('service', serviceNode, false)"
+                    @error="message => showToast('error', message)"
                   ></ServerSummary>
 
                   <ServiceView 
@@ -256,6 +261,7 @@ function newObject() {
                   <ObjectView 
                     v-else-if="selectedType === 'object'" 
                     :objectNode="selectedNode as ObjectNode"
+                    :is-new="isNewObject"
                     @service-selected="serviceNode => setNode('service', serviceNode, false)"
                     @info="message => showToast('info', message)"
                     @error="message => showToast('error', message)"
@@ -264,7 +270,7 @@ function newObject() {
                     @object-saved="isNewObject = false"
                     @select-object="objectNode => setNode('object', objectNode, false)"
                     @new-object="newObject()"
-                    :is-new="isNewObject"
+                    @closeObject="popBreadcrumb()"
                   ></ObjectView>
 
                 </div>

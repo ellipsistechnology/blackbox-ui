@@ -310,12 +310,13 @@ export class ObjectNode {
         const response = await fetch(this.service.url, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': typeof this.object === 'object' ? 'application/json' : 'text/plain'
             },
-            body: JSON.stringify(this.object)
+            body: typeof this.object === 'object' ? JSON.stringify(this.object) : this.object
         })
         if(!response.ok) {
-            throw new Error(`Error creating object at ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
+            const message = await response.json()
+            throw new Error(`Error creating object at ${this.url}: ${response.status} ${JSON.stringify(message)}`)
         }
     }
 }

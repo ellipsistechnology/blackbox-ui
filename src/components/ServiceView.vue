@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ObjectNode, ObjectReference, ServiceNode } from '@/BlackboxClient';
-import { onMounted, ref, watch, defineEmits } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import ObjectView from './ObjectView.vue';
 
 const props = defineProps<{
@@ -23,6 +23,12 @@ const values = ref<any[]>([])
 const actions = ref<string[]>([])
 
 async function loadValues() {
+    // Clear current objects and unique object node (if applicable) to show loading state:
+    if(props.serviceNode.service.access === 'unique') {
+        uniqueObjectNode.value = null
+    }
+    objectRefs.value = []
+
     // If not showing objects, clear the list:
     if(!props.showObjects) {
         objectRefs.value = []
@@ -103,7 +109,7 @@ async function refreshNode() {
     await loadValues()
     actions.value = await props.serviceNode.getActions()
     checkedObjects.value = new Array(objectRefs.value.length).fill(false)
-
+    
     // If unique access, load the single object node:
     if(props.serviceNode.service.access === 'unique' && objectRefs.value.length > 0) {
         uniqueObjectNode.value = await objectRefs.value[0]?.getObjectNode() as ObjectNode
@@ -178,9 +184,13 @@ async function deleteObjects() {
         <!-- Objects list: -->
         <div v-if="showObjects">
             <!-- Toolbar: -->
-            <div class="d-flex flex-row justify-content-between mb-1 bg-dark">
+            <div v-if="serviceNode.service.access !== 'unique'" class="d-flex flex-row justify-content-between mb-1 bg-dark">
                 <div>
-                    <button v-if="serviceNode.service.access !== 'unique'" @click="createObject()" class="btn border-0">
+                    <button 
+                        v-if="serviceNode.service.access !== 'unique'" 
+                        @click="createObject()" 
+                        class="btn border-0"
+                    >
                         <i class="bi bi-plus-lg"></i>
                     </button>
                     <button
@@ -202,6 +212,7 @@ async function deleteObjects() {
             </div>
 
             <!-- Objects: -->
+            access={{ serviceNode.service.access }}
             <div v-if="serviceNode.service.access !== 'unique'" class="list-group list-group-flush">
                 <a v-for="(obj, index) in objectRefs" 
                     href="#" 
@@ -216,8 +227,10 @@ async function deleteObjects() {
                     </div>
                     <div v-else-if="obj.error" class="text-danger">{{ obj.error?.error || obj.error?.message || obj.error }}</div>
                     <div v-else>{{ obj.props }}</div>
-                    <button v-if="serviceNode.service.access !== 'unique'" class="ms-auto btn border-0 disabled"><i class="bi bi-grip-horizontal"></i></button>
-                    <div v-if="serviceNode.service.access !== 'unique'" class="d-flex align-items-center">
+                    <button class="ms-auto btn border-0 disabled">
+                        <i class="bi bi-grip-horizontal"></i>
+                    </button>
+                    <div class="d-flex align-items-center">
                         <input 
                             class="form-check-input mt-0" 
                             type="checkbox" 
@@ -228,7 +241,10 @@ async function deleteObjects() {
                     </div>
                 </a>
             </div>
+            
+            <!-- Unique object: -->
             <div v-else>
+                objectNode passed from service to object: {{ uniqueObjectNode }}
                 <ObjectView
                     v-if="uniqueObjectNode"
                     :objectNode="uniqueObjectNode" 

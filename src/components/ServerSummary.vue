@@ -1,12 +1,11 @@
 <script setup lang="ts">
-// import BlackboxClient from '@/BlackboxClient'
-import type ServiceList from '@/types/ServiceList'
 import { ref, watch } from 'vue'
 import ServiceView from './ServiceView.vue'
 import { RootNode, ServiceNode } from '@/BlackboxClient'
 
 const emit = defineEmits([
-    'selectService'
+    'selectService',
+    'error'
 ])
 
 const serviceList = ref<ServiceNode[]|null>(null)
@@ -25,9 +24,9 @@ watch(() => props.rootNode, async (newRootNode) => {
     try {
         const references = await newRootNode.getServiceList()
         serviceList.value = await Promise.all(references.map(async ref => await ref.getServiceNode()))
-    } catch (e) {
-        serviceList.value = null
-        // TODO: emit error event
+    } catch (e: any) {
+        serviceList.value = []
+        emit('error', e?.message || e)
     }
 }, { immediate: true })
 </script>

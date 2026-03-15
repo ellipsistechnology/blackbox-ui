@@ -34,6 +34,11 @@ const parentServiceNode = ref<ServiceNode|null>(null)
 
 onMounted(loadObject)
 watch(() => props.objectNode, loadObject)
+watch(() => props.isNew, () => {
+    if(props.isNew) {
+        selectedTab.value = 'summary'
+    }
+})
 
 async function loadObject() {
     servicelist.value = await props.objectNode.getServiceList()
@@ -144,15 +149,21 @@ async function selectTab(serviceRef: ServiceReference|null) {
         selectedTab.value = 'summary'
         selectedService.value = null
     } else {
-        selectedService.value = await serviceRef.getServiceNode()
+        const serviceNode = await serviceRef.getServiceNode()
+        selectedService.value = serviceNode
         selectedTab.value = serviceRef.name
     }
 }
 
 async function selectObject(objectNode: ObjectNode) {
     selectedTab.value = 'summary'
+    const breadcrumbName = (selectedService.value ? selectedService.value.service.name+' / ' : undefined) + decodeURIComponent(objectNode.url.pathname.split('/').pop() || '?')
     selectedService.value = null
-    emit('selectObject', objectNode)
+    emit('selectObject', objectNode, breadcrumbName)
+}
+
+async function newObject() {
+    emit('newObject', selectedService.value)
 }
 </script>
 
@@ -241,14 +252,17 @@ async function selectObject(objectNode: ObjectNode) {
                 :showObjects="true" 
                 :serviceNode="selectedService as ServiceNode"
                 @select-object="objectNode => selectObject(objectNode)"
-                @new-object="emit('newObject')"
+                @new-object="newObject()"
                 @info="message => emit('info', message)"
                 @error="message => emit('error', message)"
             ></ServiceView>
         </div>
 
         <!-- Sub-service list: -->
-        <div v-if="!isNew && servicelist && servicelist.length > 0" class="ps-2 mt-2 border-top border-dark pt-2 flex-grow-1">
+        <div 
+            v-if="!isNew && servicelist && servicelist.length > 0 && objectNode.service.ui?.['subservice-display'] !== 'tabs'" 
+            class="ps-2 mt-2 border-top border-dark pt-2 flex-grow-1"
+        >
             <h5>Services provided by this object:</h5>
             <div v-for="serviceRef in servicelist" class="list-group list-group-flush">
                 <a href="#" @click="selectService(serviceRef)" class="list-group-item list-group-item-action ps-2 pe-2 pt-1 pb-1"><strong>{{ serviceRef.name }}</strong></a>

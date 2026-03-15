@@ -10,6 +10,7 @@ import ServiceView from './components/ServiceView.vue'
 import { ObjectNode, RootNode, ServiceNode } from './BlackboxClient'
 import ObjectView from './components/ObjectView.vue'
 import * as bootstrap from 'bootstrap'
+import CustomExample from './components/CustomExample.vue'
 
 type Node = RootNode | ServiceNode | ObjectNode
 type NodeType = 'server' | 'service' | 'object'
@@ -21,6 +22,7 @@ interface Breadcrumb {
     url: URL
 }
 
+const path = ref('/')
 const showSidebar = ref(true)
 const selectedType = ref<NodeType | null>(null)
 const selectedNode = ref<Node | null>(null)
@@ -31,6 +33,8 @@ const errorMessage = ref<string | null>(null)
 const isNewObject = ref<boolean>(false)
 
 function setPopover() {
+  path.value = window.location.pathname
+  
   const content = document.getElementById('popover-content')
   const pos = document.querySelectorAll('[data-bs-toggle="popover"]')
   pos.forEach(popoverEl => { // should only be 1
@@ -58,7 +62,7 @@ function jumpToBreadcrumb(index: number) {
   isNewObject.value = false
 }
 
-function setNode(type: NodeType, node: Node, reset: boolean) {
+function setNode(type: NodeType, node: Node, reset: boolean, breadcrumbName?: string) {
   selectedNode.value = node
   selectedType.value = type
   isNewObject.value = false
@@ -68,10 +72,9 @@ function setNode(type: NodeType, node: Node, reset: boolean) {
     breadcrumbs.value = [{
       type: 'server',
       node: selectedNode.value,
-      label: (selectedNode.value as RootNode).url.origin,
+      label: breadcrumbName ?? (selectedNode.value as RootNode).url.origin,
       url: (selectedNode.value as RootNode).url
     }]
-    selectedType.value = 'server'
   }
   else if(selectedType.value === 'service') {
     // Create a new breadcrumb trail starting from the root associated with the service:
@@ -87,17 +90,18 @@ function setNode(type: NodeType, node: Node, reset: boolean) {
     breadcrumbs.value.push({
       type: 'service',
       node: selectedNode.value,
-      label: (selectedNode.value as ServiceNode).service.name,
+      label: breadcrumbName ?? (selectedNode.value as ServiceNode).service.name,
       url: (selectedNode.value as ServiceNode).service.url
     })
     selectedType.value = 'service'
   }
   else if(selectedType.value === 'object') {
     // Add the selected object:
+    const node = (selectedNode.value as ObjectNode)
     breadcrumbs.value.push({
       type: 'object',
       node: selectedNode.value,
-      label: decodeURIComponent((selectedNode.value as ObjectNode).url.pathname.split('/').pop() || '?'),
+      label: breadcrumbName ?? decodeURIComponent(node.url.pathname.split('/').pop() || '?'),
       url: (selectedNode.value as ObjectNode).url
     })
     selectedType.value = 'object'
@@ -159,28 +163,40 @@ function popBreadcrumb() {
   isNewObject.value = false
 }
 
-function newObject() {
+async function newObject(serviceNode?: ServiceNode) {
     // Create a new object under the current service:
     const crumb = breadcrumbs.value[breadcrumbs.value.length - 1]
-    if(!crumb || crumb.type !== 'service') {
+    if(!serviceNode) {
+      if(!crumb || crumb.type !== 'service') {
         showToast('error', 'Cannot create new object: no service selected.')
         return
+      } else {
+        serviceNode = crumb.node as ServiceNode
+      }
     }
 
-    const serviceNode = crumb.node as ServiceNode
-    const newUrl = new URL(serviceNode.service.url.toString() + '/<new>')
+    const newIndex = serviceNode.service.access === 'id' ? 0 : Object.keys(await serviceNode.getObjects()).length
+    const newUrl = new URL(serviceNode.service.url.toString() + (serviceNode.service.access === 'id' ? '/<new>' : '/'+newIndex))
     const newObjNode = new ObjectNode(
-      new URL(serviceNode.service.url.toString() + '/<new>'), 
+      newUrl, 
       serviceNode.service, 
-      {}, 
+      (serviceNode.service.type?.schema as any)?.type === 'string' ? '' : {}, 
       undefined
     )
+
+    // If the last breadcrumb does not have the same name as the service, 
+    // prepend the service name to the object's breadcrumb label
+    // (this can happen if creating an object from the object view):
+    let newLabel = serviceNode.service.access === 'id' ? 'New' : ''+newIndex
+    if(crumb?.type !== 'service' || (crumb.node as ServiceNode).service.url.toString() !== serviceNode.service.url.toString()) {
+        newLabel = serviceNode.service.name + ' / ' + newLabel
+    }
 
     // Add breadcrumb for the new object:
     breadcrumbs.value.push({
         type: 'object',
         node: newObjNode,
-        label: 'New',
+        label: newLabel,
         url: newUrl
     })
 
@@ -192,114 +208,118 @@ function newObject() {
 
 <template>
   <BApp>
-    <div class="d-flex flex-column h-100">
+    <CustomExample v-if="path === '/custom'"></CustomExample>
 
-      <header class="flex-shrink-0">
-        <Menu @toggleSidebar="showSidebar = !showSidebar"></Menu>
-      </header>
+    <div v-else class="h-100">
+      <div class="d-flex flex-column h-100">
 
-      <main class="flex-grow-1 overflow-auto">
-        <SplitColumns :show-left="showSidebar" :min-width-left=100 :min-width-right=200 initial-split="250px" class="h-100">
-          <template #left>
-            <Sidebar 
-              @select-server="server => setNode('server', server, true)"
-              @select-service="serviceNode => setNode('service', serviceNode, true)"
-            ></Sidebar>
-          </template>
-          <template #right>
-            <div class="h-100 d-flex flex-column">
-              <!-- Breadcrumbs nav: -->
-              <nav class="d-flex flex-row m-2 p-1 ps-2">
-                <ol class="breadcrumb m-0 bg-transparent">
-                  <li v-for="(crumb, index) in breadcrumbs" class="breadcrumb-item" :class="index === breadcrumbs.length-1 ? 'active' : ''">
-                    <a v-if="index !== breadcrumbs.length-1" href="#" @click="jumpToBreadcrumb(index)" class="text-decoration-none">{{crumb.label}}</a>
-                    <span v-else>{{crumb.label}}</span>
-                  </li>
-                </ol>
+        <header class="flex-shrink-0">
+          <Menu @toggleSidebar="showSidebar = !showSidebar"></Menu>
+        </header>
 
-                <!-- Copy URL to clipboard. -->
-                <!-- Uses a popover based on the #popove-content div below. -->
-                <!-- Once copied to clipboard will show the toast below that. -->
-                <div :class="breadcrumbs.length > 0 ? '' : 'd-none'" class="ms-auto">
-                    <button type="button" class="btn border-0 p-0 pe-1" data-bs-toggle="popover">
-                        <i class="bi bi-link-45deg"></i>
-                    </button>
+        <main class="flex-grow-1 overflow-auto">
+          <SplitColumns :show-left="showSidebar" :min-width-left=100 :min-width-right=200 initial-split="250px" class="h-100">
+            <template #left>
+              <Sidebar 
+                @select-server="server => setNode('server', server, true)"
+                @select-service="serviceNode => setNode('service', serviceNode, true)"
+              ></Sidebar>
+            </template>
+            <template #right>
+              <div class="h-100 d-flex flex-column">
+                <!-- Breadcrumbs nav: -->
+                <nav class="d-flex flex-row m-2 p-1 ps-2">
+                  <ol class="breadcrumb m-0 bg-transparent">
+                    <li v-for="(crumb, index) in breadcrumbs" class="breadcrumb-item" :class="index === breadcrumbs.length-1 ? 'active' : ''">
+                      <a v-if="index !== breadcrumbs.length-1" href="#" @click="jumpToBreadcrumb(index)" class="text-decoration-none">{{crumb.label}}</a>
+                      <span v-else>{{crumb.label}}</span>
+                    </li>
+                  </ol>
+
+                  <!-- Copy URL to clipboard. -->
+                  <!-- Uses a popover based on the #popove-content div below. -->
+                  <!-- Once copied to clipboard will show the toast below that. -->
+                  <div :class="breadcrumbs.length > 0 ? '' : 'd-none'" class="ms-auto">
+                      <button type="button" class="btn border-0 p-0 pe-1" data-bs-toggle="popover">
+                          <i class="bi bi-link-45deg"></i>
+                      </button>
+                  </div>
+                  <div class="d-none">
+                      <div id="popover-content">
+                          <div class="d-flex flex-row">
+                              <div class="flex-shrink-1 overflow-hidden text-truncate">{{breadcrumbs[breadcrumbs.length-1]?.url.toString()}}</div>
+                              <button class="ms-2 btn border-0 p-0 m-0" @click="copyToClipboard(breadcrumbs[breadcrumbs.length-1]?.url?.toString() || '')">
+                                  <i class="bi bi-copy"></i>
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+                </nav>
+
+                <!-- Main Body -->
+                <div class="flex-grow-1 overflow-auto mt-4">
+
+                  <div class="ps-2 h-100">
+                    <ServerSummary 
+                      v-if="selectedType === 'server'"
+                      :rootNode="selectedNode as RootNode"
+                      @select-service="(serviceNode: ServiceNode) => setNode('service', serviceNode, false)"
+                      @error="message => showToast('error', message)"
+                    ></ServerSummary>
+
+                    <ServiceView 
+                      v-else-if="selectedType === 'service'"
+                      :show-objects="true" 
+                      :serviceNode="selectedNode as ServiceNode"
+                      @select-object="(objectNode, breadcrumbName) => setNode('object', objectNode, false, breadcrumbName)"
+                      @new-object="newObject"
+                      @info="message => showToast('info', message)"
+                      @error="message => showToast('error', message)"
+                    ></ServiceView>
+
+                    <ObjectView 
+                      v-else-if="selectedType === 'object'" 
+                      :objectNode="selectedNode as ObjectNode"
+                      :is-new="isNewObject"
+                      @service-selected="serviceNode => setNode('service', serviceNode, false)"
+                      @info="message => showToast('info', message)"
+                      @error="message => showToast('error', message)"
+                      @url-changed="urlChanged"
+                      @object-deleted="deleteObject"
+                      @object-saved="isNewObject = false"
+                      @select-object="(objectNode, breadcrumbName) => setNode('object', objectNode, false, breadcrumbName)"
+                      @new-object="(serviceNode) => newObject(serviceNode)"
+                      @closeObject="popBreadcrumb()"
+                    ></ObjectView>
+
+                  </div>
+
                 </div>
-                <div class="d-none">
-                    <div id="popover-content">
-                        <div class="d-flex flex-row">
-                            <div class="flex-shrink-1 overflow-hidden text-truncate">{{breadcrumbs[breadcrumbs.length-1]?.url.toString()}}</div>
-                            <button class="ms-2 btn border-0 p-0 m-0" @click="copyToClipboard(breadcrumbs[breadcrumbs.length-1]?.url?.toString() || '')">
-                                <i class="bi bi-copy"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-              </nav>
-
-              <!-- Main Body -->
-              <div class="flex-grow-1 overflow-auto mt-4">
-
-                <div class="ps-2 h-100">
-                  <ServerSummary 
-                    v-if="selectedType === 'server'"
-                    :rootNode="selectedNode as RootNode"
-                    @select-service="(serviceNode: ServiceNode) => setNode('service', serviceNode, false)"
-                    @error="message => showToast('error', message)"
-                  ></ServerSummary>
-
-                  <ServiceView 
-                    v-else-if="selectedType === 'service'"
-                    :show-objects="true" 
-                    :serviceNode="selectedNode as ServiceNode"
-                    @select-object="objectNode => setNode('object', objectNode, false)"
-                    @new-object="newObject()"
-                    @info="message => showToast('info', message)"
-                    @error="message => showToast('error', message)"
-                  ></ServiceView>
-
-                  <ObjectView 
-                    v-else-if="selectedType === 'object'" 
-                    :objectNode="selectedNode as ObjectNode"
-                    :is-new="isNewObject"
-                    @service-selected="serviceNode => setNode('service', serviceNode, false)"
-                    @info="message => showToast('info', message)"
-                    @error="message => showToast('error', message)"
-                    @url-changed="urlChanged"
-                    @object-deleted="deleteObject"
-                    @object-saved="isNewObject = false"
-                    @select-object="objectNode => setNode('object', objectNode, false)"
-                    @new-object="newObject()"
-                    @closeObject="popBreadcrumb()"
-                  ></ObjectView>
-
-                </div>
-
               </div>
-            </div>
-          </template>
-        </SplitColumns>
-      </main>
-    </div>
-    
-    <!-- Toast containers -->
-    <div class="toast-container position-fixed top-0 end-0 p-3">
-        <div id="infoToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <i class="bi bi-copy me-2"></i>
-                <strong class="me-auto">{{infoMessage}}</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    </div>
-    <div class="toast-container position-fixed top-0 end-0 p-3">
-        <div id="errorToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <i class="bi bi-copy me-2"></i>
-                <strong class="me-auto text-danger">{{errorMessage}}</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
+            </template>
+          </SplitColumns>
+        </main>
+      </div>
+      
+      <!-- Toast containers -->
+      <div class="toast-container position-fixed top-0 end-0 p-3">
+          <div id="infoToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+              <div class="toast-header">
+                  <i class="bi bi-copy me-2"></i>
+                  <strong class="me-auto">{{infoMessage}}</strong>
+                  <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+              </div>
+          </div>
+      </div>
+      <div class="toast-container position-fixed top-0 end-0 p-3">
+          <div id="errorToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+              <div class="toast-header">
+                  <i class="bi bi-copy me-2"></i>
+                  <strong class="me-auto text-danger">{{errorMessage}}</strong>
+                  <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+              </div>
+          </div>
+      </div>
     </div>
   </BApp>
 </template>

@@ -91,8 +91,9 @@ export class ServiceNode {
     async getObjects(): Promise<ObjectReference[]> {
         const response = await fetch(this.service.url)
         if(!response.ok) {
-            console.error(`Error fetching objects from ${this.service.url}: ${response.status} `, await response.json())
-            return []
+            // console.error(`Error fetching objects from ${this.service.url}: ${response.status} `, await response.json())
+            // return []
+            throw new Error(`Error fetching objects from ${this.service.url}: ${response.status} ` + await response.json())
         }
         const data = await response.json()
         
@@ -108,12 +109,12 @@ export class ServiceNode {
 
             // Create object references for each lsited object:
             return data.map((o: any, i: number) => {
-                if(this.service.access === 'index') {
-                    const objectUrl = new URL(`${this.service.url.href}/${i}`, this.service.url)
-                    return new ObjectReference(objectUrl, this.service, o)
-                } else {
+                if(this.service.access === 'id') {
                     const id = this.service.identifier ? o[this.service.identifier] : o.id
                     const objectUrl = new URL(`${this.service.url.href}/${id}`, this.service.url)
+                    return new ObjectReference(objectUrl, this.service, o)
+                } else { // default is by index
+                    const objectUrl = new URL(`${this.service.url.href}/${i}`, this.service.url)
                     return new ObjectReference(objectUrl, this.service, o)
                 }
             })
@@ -284,9 +285,9 @@ export class ObjectNode {
         const response = await fetch(this.url, {
             method: 'PATCH',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': typeof this.object === 'object' ? 'application/json' : 'text/plain'
             },
-            body: JSON.stringify(this.object)
+            body: typeof this.object === 'object' ? JSON.stringify(this.object) : this.object
         })
         if(!response.ok) {
             throw new Error(`Error updating object at ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
@@ -297,9 +298,9 @@ export class ObjectNode {
         const response = await fetch(this.url, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': typeof this.object === 'object' ? 'application/json' : 'text/plain'
             },
-            body: JSON.stringify(this.object)
+            body: typeof this.object === 'object' ? JSON.stringify(this.object) : this.object
         })
         if(!response.ok) {
             throw new Error(`Error replacing object at ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
@@ -316,7 +317,7 @@ export class ObjectNode {
         })
         if(!response.ok) {
             const message = await response.json()
-            throw new Error(`Error creating object at ${this.url}: ${response.status} ${JSON.stringify(message)}`)
+            throw new Error(`Error creating object at ${this.service.url}: ${response.status} ${JSON.stringify(message)}`)
         }
     }
 }

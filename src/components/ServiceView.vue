@@ -21,6 +21,19 @@ const uniqueObjectNode = ref<ObjectNode|null>(null)
 const checkedObjects = ref<boolean[]>([])
 const values = ref<any[]>([])
 const actions = ref<string[]>([])
+const objectError = ref<boolean>(false)
+
+function sendSetService() {
+    const iframe = document.getElementById('service-view-iframe') as HTMLIFrameElement
+    if(iframe && iframe.contentWindow) {
+        const msg = {
+            type: 'set-service',
+            service: JSON.parse(JSON.stringify(props.serviceNode.service)),
+            refs: JSON.parse(JSON.stringify(objectRefs.value)) as ObjectReference[]
+        }
+        iframe.contentWindow?.postMessage(msg, '*')
+    }
+}
 
 async function loadValues() {
     // Clear current objects and unique object node (if applicable) to show loading state:
@@ -28,6 +41,7 @@ async function loadValues() {
         uniqueObjectNode.value = null
     }
     objectRefs.value = []
+    objectError.value = false
 
     // If not showing objects, clear the list:
     if(!props.showObjects) {
@@ -37,7 +51,14 @@ async function loadValues() {
     }
 
     // Load the objects for this service:
-    objectRefs.value = await props.serviceNode.getObjects()
+    try {
+        objectRefs.value = await props.serviceNode.getObjects()
+    } catch(error) {
+        console.error(error)
+        emit('error', 'Failed to load object(s).')
+        objectError.value = true
+        return
+    }
     values.value = objectRefs.value.reduce((acc: any[], curr: ObjectReference) => {
         if(typeof curr.props !== 'object') {
             acc.push(curr.props)
@@ -52,39 +73,65 @@ async function loadValues() {
     if(props.serviceNode.service.ui?.['service-view']?.href) {
         const iframe = document.getElementById('service-view-iframe') as HTMLIFrameElement
         if(iframe && iframe.contentWindow) {
-            setTimeout(() => {
-                // Send the service and objects to the iframe:
-                const msg = {
-                    type: 'set-service',
-                    service: JSON.parse(JSON.stringify(props.serviceNode.service)),
-                    objectRefs: objectRefs.value.map(obj => JSON.parse(JSON.stringify(obj)))
-                }
-                iframe.contentWindow?.postMessage(msg, '*')
+            // setTimeout(() => {
 
                 // Listen for messages from the iframe:
                 window.addEventListener('message', async (event) => {
-                    if(event.data.type === 'select-object') {
-                        // const objIndex = event.data.objectIndex
-                        // selectObject(objects.value[objIndex])
-                    } else if(event.data.type === 'new-object') {
-                        // createObject()
-                    } else if(event.data.type === 'delete-objects') {
-                        // deleteObjects()
-                    } else if(event.data.type === 'update-object') {
-                        updateObject(new ObjectReference(event.data.ref, props.serviceNode.service), event.data.object)
-                    } else if(event.data.type === 'info' || event.data.type === 'error') {
-                        emit(event.data.type, event.data.message)
-                    } else if(event.data.type === 'get-objects') {
-                        const msg = {
-                            type: 'set-objects',
-                            objects: await Promise.all(
-                                objectRefs.value.map(async obj => JSON.parse(JSON.stringify(await obj.getObjectNode())))
-                            )
-                        }
-                        iframe.contentWindow?.postMessage(msg, '*')
+                    switch(event.data?.type) {
+                        case 'select-object':
+                            selectObject(new ObjectReference(new URL(event.data.ref.url), props.serviceNode.service))
+                            break
+                        case 'create-object':
+                            emit('newObject')
+                            break
+                        case 'get-service':
+                            sendSetService()
+                            break
+                        case 'delete-objects':
+                            
+                            break
+                        case 'update-objects':
+                            
+                            break
+                        case 'info':
+                        case 'error':
+                            emit(event.data.type, event.data.message)
+                            break
+                        // case 'get-objects':
+                        //     const refs = JSON.parse(JSON.stringify(objectRefs.value)) as ObjectReference[]
+                        //     // await Promise.all(
+                        //     //     objectRefs.value.map(async obj => JSON.parse(JSON.stringify(await obj.getObjectNode())))
+                        //     // )
+
+                        //     const msg = {
+                        //         type: 'set-objects',
+                        //         refs: refs
+                        //     }
+                        //     iframe.contentWindow?.postMessage(msg, '*')
+                        //     break 
                     }
+                    // if(event.data.type === 'select-object') {
+                    //     // const objIndex = event.data.objectIndex
+                    //     // selectObject(objects.value[objIndex])
+                    // } else if(event.data.type === 'create-object') {
+                    //     // createObject()
+                    // } else if(event.data.type === 'delete-objects') {
+                    //     // deleteObjects()
+                    // } else if(event.data.type === 'update-object') {
+                    //     updateObject(new ObjectReference(event.data.ref, props.serviceNode.service), event.data.object)
+                    // } else if(event.data.type === 'info' || event.data.type === 'error') {
+                    //     emit(event.data.type, event.data.message)
+                    // } else if(event.data.type === 'get-objects') {
+                    //     const msg = {
+                    //         type: 'set-objects',
+                    //         objects: await Promise.all(
+                    //             objectRefs.value.map(async obj => JSON.parse(JSON.stringify(await obj.getObjectNode())))
+                    //         )
+                    //     }
+                    //     iframe.contentWindow?.postMessage(msg, '*')
+                    // }
                 })
-            }, 100)
+            // }, 100)
         }
     }
 }
@@ -107,9 +154,10 @@ async function updateObject(ref: ObjectReference, obj: any) {
 
 async function refreshNode() {
     await loadValues()
+    sendSetService()
     actions.value = await props.serviceNode.getActions()
     checkedObjects.value = new Array(objectRefs.value.length).fill(false)
-    
+
     // If unique access, load the single object node:
     if(props.serviceNode.service.access === 'unique' && objectRefs.value.length > 0) {
         uniqueObjectNode.value = await objectRefs.value[0]?.getObjectNode() as ObjectNode
@@ -160,7 +208,7 @@ async function deleteObjects() {
 <template>
     {{ serviceNode.service.ui }}
     <!-- Custom UI: -->
-    <div v-if="serviceNode.service.ui?.['service-view']?.href" class="d-flex flex-column h-100">
+    <div v-if="serviceNode.service.ui?.['service-view']?.href && showObjects" class="d-flex flex-column h-100">
         <iframe 
             id="service-view-iframe"
             :src="serviceNode.service.ui?.['service-view'].href" 
@@ -212,7 +260,6 @@ async function deleteObjects() {
             </div>
 
             <!-- Objects: -->
-            access={{ serviceNode.service.access }}
             <div v-if="serviceNode.service.access !== 'unique'" class="list-group list-group-flush">
                 <a v-for="(obj, index) in objectRefs" 
                     href="#" 
@@ -244,7 +291,6 @@ async function deleteObjects() {
             
             <!-- Unique object: -->
             <div v-else>
-                objectNode passed from service to object: {{ uniqueObjectNode }}
                 <ObjectView
                     v-if="uniqueObjectNode"
                     :objectNode="uniqueObjectNode" 
@@ -252,7 +298,7 @@ async function deleteObjects() {
                     @info="msg => emit('info', msg)"
                     @error="msg => emit('error', msg)"
                 ></ObjectView>
-                <div v-else class="text-muted">
+                <div v-else-if="!objectError" class="text-muted">
                     <div>Loading...</div>
                 </div>
             </div>

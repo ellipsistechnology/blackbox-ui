@@ -36,7 +36,6 @@ function onMessage(event: MessageEvent<ServiceMessage>) {
 	}
 }
 
-
 function createObject() {
 	post('create-object')
 	post('info', { message: 'Create object requested.' })
@@ -48,7 +47,7 @@ function deleteSelected() {
 		return
 	}
 
-	post('delete-objects', { objectIndexes: [...selectedIndexes.value] })
+	post('delete-objects', { refs: selectedIndexes.value.map(i => toRaw(objectRefs.value[i])) })
 	post('info', { message: `Delete requested for ${selectedIndexes.value.length} object(s).` })
 }
 

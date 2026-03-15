@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ObjectNode, ObjectReference, ServiceNode } from '@/BlackboxClient';
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref, toRaw, watch } from 'vue';
 import ObjectView from './ObjectView.vue';
 
 const props = defineProps<{
@@ -73,67 +73,74 @@ async function loadValues() {
     if(props.serviceNode.service.ui?.['service-view']?.href) {
         const iframe = document.getElementById('service-view-iframe') as HTMLIFrameElement
         if(iframe && iframe.contentWindow) {
-            // setTimeout(() => {
 
-                // Listen for messages from the iframe:
-                window.addEventListener('message', async (event) => {
-                    switch(event.data?.type) {
-                        case 'select-object':
-                            selectObject(new ObjectReference(new URL(event.data.ref.url), props.serviceNode.service))
-                            break
-                        case 'create-object':
-                            emit('newObject')
-                            break
-                        case 'get-service':
-                            sendSetService()
-                            break
-                        case 'delete-objects':
-                            
-                            break
-                        case 'update-objects':
-                            
-                            break
-                        case 'info':
-                        case 'error':
-                            emit(event.data.type, event.data.message)
-                            break
-                        // case 'get-objects':
-                        //     const refs = JSON.parse(JSON.stringify(objectRefs.value)) as ObjectReference[]
-                        //     // await Promise.all(
-                        //     //     objectRefs.value.map(async obj => JSON.parse(JSON.stringify(await obj.getObjectNode())))
-                        //     // )
-
-                        //     const msg = {
-                        //         type: 'set-objects',
-                        //         refs: refs
-                        //     }
-                        //     iframe.contentWindow?.postMessage(msg, '*')
-                        //     break 
-                    }
-                    // if(event.data.type === 'select-object') {
-                    //     // const objIndex = event.data.objectIndex
-                    //     // selectObject(objects.value[objIndex])
-                    // } else if(event.data.type === 'create-object') {
-                    //     // createObject()
-                    // } else if(event.data.type === 'delete-objects') {
-                    //     // deleteObjects()
-                    // } else if(event.data.type === 'update-object') {
-                    //     updateObject(new ObjectReference(event.data.ref, props.serviceNode.service), event.data.object)
-                    // } else if(event.data.type === 'info' || event.data.type === 'error') {
-                    //     emit(event.data.type, event.data.message)
-                    // } else if(event.data.type === 'get-objects') {
-                    //     const msg = {
-                    //         type: 'set-objects',
-                    //         objects: await Promise.all(
-                    //             objectRefs.value.map(async obj => JSON.parse(JSON.stringify(await obj.getObjectNode())))
-                    //         )
-                    //     }
-                    //     iframe.contentWindow?.postMessage(msg, '*')
-                    // }
-                })
-            // }, 100)
+            // Listen for messages from the iframe:
+            window.addEventListener('message', async (event) => {
+                switch(event.data?.type) {
+                    case 'select-object':
+                        selectObject(new ObjectReference(new URL(event.data.ref.url), props.serviceNode.service))
+                        break
+                    case 'create-object':
+                        emit('newObject')
+                        break
+                    case 'get-service':
+                        sendSetService()
+                        break
+                    case 'delete-objects':
+                        const refs = event.data.refs as ObjectReference[]
+                        deleteByRefs(refs)
+                        break
+                    case 'update-objects':
+                        
+                        break
+                    case 'info':
+                    case 'error':
+                        emit(event.data.type, event.data.message)
+                        break
+                }
+                // } else if(event.data.type === 'update-object') {
+                //     updateObject(new ObjectReference(event.data.ref, props.serviceNode.service), event.data.object)
+            })
         }
     }
+}
+
+async function deleteByRefs(refs: ObjectReference[]) {
+
+    // If access is by index we need sort and delete last to first (index is default access):
+    if(!props.serviceNode.service.access || props.serviceNode.service.access === 'index') {
+        refs.sort((a, b) => {
+            const indexA = objectRefs.value.findIndex(ref => ref.url?.toString() === a.url?.toString())
+            const indexB = objectRefs.value.findIndex(ref => ref.url?.toString() === b.url?.toString())
+            return indexB - indexA
+        })
+    }
+
+    // Delete each object:
+    for(let delRef of refs) {
+        const ref = <ObjectReference>objectRefs.value.find(ref => ref.url?.toString() === delRef.url?.toString())
+        if(ref) {
+            // Delete the object:
+            try {
+                const objNode = await ref.getObjectNode()
+                await objNode.deleteObject()
+                emit('info', `Object deleted successfully.`)
+                emit('objectDeleted', objNode)
+            } catch(err: any) {
+                    emit('error', `Error deleting object: ${err.message || err}`)
+                    console.error(`Error deleting object: `, err)
+            }
+
+            // Remove from the list of object refs:
+            objectRefs.value = objectRefs.value.filter(r => r.url?.toString() !== ref.url?.toString())
+        } else {
+            emit('error', `Object reference not found for deletion: ${delRef.url}`)
+            console.error(`Object reference not found for deletion: `, delRef)
+        }
+    }
+
+    // Reload the objects list:
+    sendSetService()
 }
 
 async function updateObject(ref: ObjectReference, obj: any) {

@@ -190,10 +190,8 @@ async function newObject() {
         </ul>
 
         <!-- Summary Tab OR not displayed as tabs -->
-        {{ objectNode.service.ui?.['subservice-display'] === 'tabs' ? 'tab='+selectedTab+'; ' : '' }}service={{ objectNode.service.name }}
         <div v-if="selectedTab === 'summary'">
             <!-- Toolbar: -->
-             {{actions}}
             <div class="d-flex flex-row justify-content-between mb-1 bg-dark">
                 <div>
                     <button 

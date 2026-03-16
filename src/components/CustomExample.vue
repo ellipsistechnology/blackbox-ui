@@ -15,7 +15,6 @@ type ObjectRef = {
 
 const service = ref<ServiceMessage['service'] | null>(null)
 const objectRefs = ref<ObjectRef[]>([])
-const fullObjects = ref<unknown[]>([])
 const selectedIndexes = ref<number[]>([])
 
 const selectedCount = computed(() => selectedIndexes.value.length)
@@ -51,6 +50,19 @@ function deleteSelected() {
 	post('info', { message: `Delete requested for ${selectedIndexes.value.length} object(s).` })
 }
 
+function updateSelected() {
+	if(selectedIndexes.value.length === 0) {
+		post('error', { message: 'No objects selected for update.' })
+		return
+	}
+
+	post('update-objects', {
+		refs: selectedIndexes.value.map(i => toRaw(objectRefs.value[i])), 
+		objects: selectedIndexes.value.map(i => toRaw(objectRefs.value[i]?.props)+' UPDATED') 
+	})
+	post('info', { message: `Update requested for ${selectedIndexes.value.length} object(s).` })
+}
+
 function selectObject(index: number) {
 	post('select-object', { ref: toRaw(objectRefs.value[index]) })
 	post('info', { message: `Selected object #${index + 1}.` })
@@ -78,23 +90,24 @@ onBeforeUnmount(() => {
 <template>
 	<section class="custom-example p-3">
 		<h1 class="mb-1">Custom Service UI</h1>
-		<p class="text-muted mb-3">Handles create, delete, get, select, info and error messages.</p>
+		<p class=" mb-3">Handles create, delete, get, select, info and error messages.</p>
 
 		<div class="d-flex gap-2 mb-3">
 			<button class="btn btn-sm btn-primary" @click="createObject">Create</button>
 			<button class="btn btn-sm btn-danger" @click="deleteSelected">Delete Selected</button>
+			<button class="btn btn-sm btn-secondary" @click="updateSelected">Update Selected</button>
 			<button class="btn btn-sm btn-outline-info" @click="post('info', { message: 'Info from CustomExample.' })">Send Info</button>
 			<button class="btn btn-sm btn-outline-warning" @click="post('error', { message: 'Error from CustomExample.' })">Send Error</button>
 		</div>
 
 		<div v-if="service" class="mb-3">
 			<div><strong>{{ service.name || 'Unnamed Service' }}</strong></div>
-			<div class="text-muted">{{ service.summary || service.description }}</div>
+			<div class="">{{ service.summary || service.description }}</div>
 		</div>
 
 		<div class="mb-2">
 			<strong>Objects</strong>
-			<span class="text-muted ms-2">Selected: {{ selectedCount }}</span>
+			<span class=" ms-2">Selected: {{ selectedCount }}</span>
 		</div>
 		<ul class="list-group">
 			<li
@@ -114,11 +127,7 @@ onBeforeUnmount(() => {
 					</button>
 				</div>
 			</li>
-			<li v-if="objectRefs.length === 0" class="list-group-item text-muted">No objects received.</li>
+			<li v-if="objectRefs.length === 0" class="list-group-item ">No objects received.</li>
 		</ul>
-
-		<div v-if="fullObjects.length" class="mt-3">
-			<strong>Fetched object payloads: {{ fullObjects.length }}</strong>
-		</div>
 	</section>
 </template>

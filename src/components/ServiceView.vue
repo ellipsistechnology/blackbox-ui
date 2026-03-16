@@ -31,7 +31,53 @@ function sendSetService() {
             service: JSON.parse(JSON.stringify(props.serviceNode.service)),
             refs: JSON.parse(JSON.stringify(objectRefs.value)) as ObjectReference[]
         }
+console.log('Sending set-service message to iframe:', msg)
         iframe.contentWindow?.postMessage(msg, '*')
+    }
+}
+
+async function customUIEventListener(event: any) {
+    switch(event.data?.type) {
+        case 'select-object':
+            selectObject(new ObjectReference(new URL(event.data.ref.url), props.serviceNode.service))
+            break
+        case 'create-object':
+            emit('newObject')
+            break
+        case 'get-service':
+            sendSetService()
+            break
+        case 'delete-objects':
+            const refs = event.data.refs as ObjectReference[]
+            deleteByRefs(refs)
+            break
+        case 'update-objects':
+            if(!Array.isArray(event.data.objects) || !Array.isArray(event.data.refs) || event.data.objects.length !== event.data.refs.length) {
+                emit('error', 'Invalid update-objects message format.')
+                return
+            }
+            for(let i = 0; i < event.data.objects.length; i++) {
+                const obj = event.data.objects[i]
+                const ref = event.data.refs[i]
+                if(!ref.url) {
+                    emit('error', 'Invalid object reference in update-objects message.')
+                    continue
+                }
+                const updatedRef = new ObjectReference(new URL(ref.url), props.serviceNode.service, obj)
+                await updateObject(updatedRef, obj)
+            }
+
+            emit('info', `Updated successfully.`)
+
+            // Reload the objects list:
+            sendSetService()
+            break
+        case 'replace-objects':
+            break
+        case 'info':
+        case 'error':
+            emit(event.data.type, event.data.message)
+            break
     }
 }
 
@@ -75,32 +121,8 @@ async function loadValues() {
         if(iframe && iframe.contentWindow) {
 
             // Listen for messages from the iframe:
-            window.addEventListener('message', async (event) => {
-                switch(event.data?.type) {
-                    case 'select-object':
-                        selectObject(new ObjectReference(new URL(event.data.ref.url), props.serviceNode.service))
-                        break
-                    case 'create-object':
-                        emit('newObject')
-                        break
-                    case 'get-service':
-                        sendSetService()
-                        break
-                    case 'delete-objects':
-                        const refs = event.data.refs as ObjectReference[]
-                        deleteByRefs(refs)
-                        break
-                    case 'update-objects':
-                        
-                        break
-                    case 'info':
-                    case 'error':
-                        emit(event.data.type, event.data.message)
-                        break
-                }
-                // } else if(event.data.type === 'update-object') {
-                //     updateObject(new ObjectReference(event.data.ref, props.serviceNode.service), event.data.object)
-            })
+            window.removeEventListener('message', customUIEventListener)
+            window.addEventListener('message', customUIEventListener)
         }
     }
 }
@@ -148,15 +170,20 @@ async function updateObject(ref: ObjectReference, obj: any) {
     const objNode = await ref.getObjectNode()
 
     // Update only the provided fields:
-    for(const [key, value] of Object.entries(obj)) {
-        objNode.object[key] = value
+    if(typeof obj !== 'object') {
+        objNode.object = obj
+    } else {
+        for(const [key, value] of Object.entries(obj)) {
+            objNode.object[key] = value
+        }
     }
     await objNode.update()
 
-    // Reload the objects list:
-    loadValues()
-
-    emit('info', `Updated successfully.`)
+    // Update objectRefs:
+    const index = objectRefs.value.findIndex(r => r.url?.toString() === ref.url?.toString())
+    if(index !== -1) {
+        objectRefs.value[index] = ref
+    }
 }
 
 async function refreshNode() {
@@ -213,7 +240,6 @@ async function deleteObjects() {
 </script>
 
 <template>
-    {{ serviceNode.service.ui }}
     <!-- Custom UI: -->
     <div v-if="serviceNode.service.ui?.['service-view']?.href && showObjects" class="d-flex flex-column h-100">
         <iframe 

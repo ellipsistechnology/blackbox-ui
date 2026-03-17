@@ -63,6 +63,24 @@ function updateSelected() {
 	post('info', { message: `Update requested for ${selectedIndexes.value.length} object(s).` })
 }
 
+function replaceSelected() {
+	if(selectedIndexes.value.length === 0) {
+		post('error', { message: 'No objects selected for replace.' })
+		return
+	}
+
+	post('replace-objects', {
+		refs: selectedIndexes.value.map(i => toRaw(objectRefs.value[i])),
+		objects: selectedIndexes.value.map(i => {
+			const props = toRaw(objectRefs.value[i]?.props)
+			return typeof props === 'object' && props !== null
+				? { ...props, replaced: true }
+				: String(props) + ' REPLACED'
+		})
+	})
+	post('info', { message: `Replace requested for ${selectedIndexes.value.length} object(s).` })
+}
+
 function selectObject(index: number) {
 	post('select-object', { ref: toRaw(objectRefs.value[index]) })
 	post('info', { message: `Selected object #${index + 1}.` })
@@ -96,6 +114,7 @@ onBeforeUnmount(() => {
 			<button class="btn btn-sm btn-primary" @click="createObject">Create</button>
 			<button class="btn btn-sm btn-danger" @click="deleteSelected">Delete Selected</button>
 			<button class="btn btn-sm btn-secondary" @click="updateSelected">Update Selected</button>
+			<button class="btn btn-sm btn-warning" @click="replaceSelected">Replace Selected</button>
 			<button class="btn btn-sm btn-outline-info" @click="post('info', { message: 'Info from CustomExample.' })">Send Info</button>
 			<button class="btn btn-sm btn-outline-warning" @click="post('error', { message: 'Error from CustomExample.' })">Send Error</button>
 		</div>

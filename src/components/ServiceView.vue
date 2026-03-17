@@ -73,6 +73,25 @@ async function customUIEventListener(event: any) {
             sendSetService()
             break
         case 'replace-objects':
+            if(!Array.isArray(event.data.objects) || !Array.isArray(event.data.refs) || event.data.objects.length !== event.data.refs.length) {
+                emit('error', 'Invalid replace-objects message format.')
+                return
+            }
+            for(let i = 0; i < event.data.objects.length; i++) {
+                const obj = event.data.objects[i]
+                const ref = event.data.refs[i]
+                if(!ref.url) {
+                    emit('error', 'Invalid object reference in replace-objects message.')
+                    continue
+                }
+                const updatedRef = new ObjectReference(new URL(ref.url), props.serviceNode.service, obj)
+                await replaceObject(updatedRef, obj)
+            }
+
+            emit('info', `Replaced successfully.`)
+
+            // Reload the objects list:
+            sendSetService()
             break
         case 'info':
         case 'error':
@@ -178,6 +197,21 @@ async function updateObject(ref: ObjectReference, obj: any) {
         }
     }
     await objNode.update()
+
+    // Update objectRefs:
+    const index = objectRefs.value.findIndex(r => r.url?.toString() === ref.url?.toString())
+    if(index !== -1) {
+        objectRefs.value[index] = ref
+    }
+}
+
+async function replaceObject(ref: ObjectReference, obj: any) {
+    // Get current object ready for replacement:
+    const objNode = await ref.getObjectNode()
+
+    // Replace the object with the provided payload:
+    objNode.object = obj
+    await objNode.replace()
 
     // Update objectRefs:
     const index = objectRefs.value.findIndex(r => r.url?.toString() === ref.url?.toString())

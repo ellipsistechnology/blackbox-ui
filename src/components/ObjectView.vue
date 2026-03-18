@@ -206,7 +206,7 @@ async function newObject() {
                         class="btn border-0"
                         @click="deleteObject()"
                     >
-                        <i class="bi bi-trash3"></i>
+                        <i class="bi bi-trash3 text-danger"></i>
                     </button>
                     
                     <button 

@@ -32,9 +32,26 @@ watch(() => props.rootNode, async (newRootNode) => {
 </script>
 
 <template>
-    <div v-if="serviceList" v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="p-0">
-        <ServiceView :serviceNode="serviceNode"></ServiceView>
-        <button class="btn btn-outline-primary" @click="emit('selectService', serviceNode)">Open Service</button>
+    <div v-if="serviceList" class="container-fluid px-0">
+        <div v-if="serviceList.length > 0" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+            <div v-for="serviceNode in serviceList" :key="serviceNode.service.name" class="col">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="card-title mb-0">{{ serviceNode.service.name }}</h5>
+                            <small class="text-secondary">{{ serviceNode.service.summary }}</small>
+                        </div>
+                        <a href="#" @click.stop="emit('selectService', serviceNode)"><i class="bi bi-arrow-up-right-square"></i></a>
+                    </div>
+                    <div class="card-body">
+                        {{ serviceNode.service.description }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div v-else class="alert alert-light border mb-0">
+            No services available.
+        </div>
     </div>
     <div v-else>
         Loading from {{ rootNode?.url }}...

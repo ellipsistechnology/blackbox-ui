@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import {BApp} from 'bootstrap-vue-next'
-// import 'bootstrap/dist/js/bootstrap.bundle.min.js'
-import Menu from './components/Menu.vue'
 import Sidebar from './components/Sidebar.vue'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import SplitColumns from './components/SplitColumns.vue'
 import ServerSummary from './components/ServerSummary.vue'
 import ServiceView from './components/ServiceView.vue'
@@ -213,13 +211,19 @@ async function newObject(serviceNode?: ServiceNode) {
     <div v-else class="h-100">
       <div class="d-flex flex-column h-100">
 
-        <header class="flex-shrink-0">
+        <!-- <header class="flex-shrink-0">
           <Menu @toggleSidebar="showSidebar = !showSidebar"></Menu>
-        </header>
+        </header> -->
 
         <main class="flex-grow-1 overflow-auto">
           <SplitColumns :show-left="showSidebar" :min-width-left=100 :min-width-right=200 initial-split="250px" class="h-100">
             <template #left>
+              <div class="mt-2 ms-1 mb-2">
+                <a class="navbar-brand" href="#" @click="showSidebar = false">
+                  <!-- Burger icon for showing sidebar: -->
+                  <i class="bi bi-arrow-bar-left fs-5"></i>
+                </a>
+              </div>
               <Sidebar 
                 @select-server="server => setNode('server', server, true)"
                 @select-service="serviceNode => setNode('service', serviceNode, true)"
@@ -228,8 +232,12 @@ async function newObject(serviceNode?: ServiceNode) {
             <template #right>
               <div class="h-100 d-flex flex-column">
                 <!-- Breadcrumbs nav: -->
-                <nav class="d-flex flex-row m-2 p-1 ps-2">
-                  <ol class="breadcrumb m-0 bg-transparent">
+                <nav class="d-flex flex-row m-2 ms-1">
+                  <a v-if="!showSidebar" class="navbar-brand me-3" href="#" @click="showSidebar = !showSidebar">
+                    <!-- Burger icon for showing sidebar: -->
+                    <i class="bi bi-list fs-5"></i>
+                  </a>
+                  <ol class="breadcrumb m-0 mt-1 ms-1 bg-transparent">
                     <li v-for="(crumb, index) in breadcrumbs" class="breadcrumb-item" :class="index === breadcrumbs.length-1 ? 'active' : ''">
                       <a v-if="index !== breadcrumbs.length-1" href="#" @click="jumpToBreadcrumb(index)" class="text-decoration-none">{{crumb.label}}</a>
                       <span v-else>{{crumb.label}}</span>
@@ -259,7 +267,7 @@ async function newObject(serviceNode?: ServiceNode) {
                 <!-- Main Body -->
                 <div class="flex-grow-1 overflow-auto mt-4">
 
-                  <div class="ps-2 h-100">
+                  <div class="ps-2 pe-2 h-100">
                     <ServerSummary 
                       v-if="selectedType === 'server'"
                       :rootNode="selectedNode as RootNode"

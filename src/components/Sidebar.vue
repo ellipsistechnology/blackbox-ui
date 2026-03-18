@@ -100,7 +100,7 @@ function removeServer(index: number) {
                 </button>
             </template>
             <template #body>
-                <div class="list-group rounded-0">
+                <div class="list-group rounded-0 mb-1">
                     <div v-for="(server, index) in localServers"
                         class="server-row list-group-item list-group-item-action p-0 pe-2 border-0 d-flex align-items-center"
                     >
@@ -146,7 +146,7 @@ function removeServer(index: number) {
                 </button>
             </template>
             <template #body>
-                <div class="list-group rounded-0">
+                <div class="list-group rounded-0 mb-1">
                     <a v-for="serviceRef in services"
                         href="#" 
                         @click="selectService(serviceRef)"

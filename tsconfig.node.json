@@ -13,7 +13,7 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "es2022",
     "module": "nodeNext",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "NodeNext",
     "types": ["node"],
 
     "strict": true,

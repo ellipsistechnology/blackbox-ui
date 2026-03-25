@@ -26,6 +26,37 @@ async function resolveRefs(schema: any) {
     }
 }
 
+function isSchemaArray(): boolean {
+    if(!props.schema) {
+        return false
+    }
+
+    if(props.schema.type === 'array' && props.schema.items) {
+        return true
+    }
+
+    if(Array.isArray(props.schema.anyOf)) {
+        return props.schema.anyOf.some((s: any) => s.type === 'array' && s.items)
+    }
+
+    return false
+}
+
+function getArraySchema(): Oas3schema | undefined {
+    if(props.schema?.type === 'array' && props.schema.items) {
+        return props.schema.items as Oas3schema
+    }
+
+    if(Array.isArray(props.schema?.anyOf)) {
+        const arraySchema = props.schema.anyOf.find((s: any) => s.type === 'array' && s.items)
+        if(arraySchema) {
+            return arraySchema.items as Oas3schema
+        }
+    }
+
+    return undefined
+}
+
 onMounted(async () => {
     resolveRefs(props.schema)
     openCollapse.value = true
@@ -38,12 +69,11 @@ watch(async () => props.schema, () => {
 </script>
 
 <template>
-
-    <!-- Primative: -->
     <div 
-        v-if="['number', 'string'].includes(typeof modelValue) || schema && ['number', 'string'].includes(schema.type)"
+        v-if="['number', 'string', 'boolean'].includes(typeof modelValue) || schema && ['number', 'string', 'boolean'].includes(schema.type)"
         class="d-inline-block ms-3 w-100"
     >
+        <!-- Primative: -->
         <input 
             class="form-control-sm" 
             :readonly="!editing && !isNew" 
@@ -54,12 +84,12 @@ watch(async () => props.schema, () => {
         ></input>
     </div>
 
-    <!-- Array: -->
-    <ul v-else-if="schema?.type === 'array' && schema.items && Array.isArray(modelValue)" class="list-unstyled">
-        <li v-for="(_, index) in modelValue" :key="index" class="mb-2">
+    <ul v-else-if="isSchemaArray() && Array.isArray(modelValue)" class="list-unstyled">
+        <!-- Array: -->
+        <li v-for="(_, index) in modelValue" :key="index" class="border-top border-dark">
             <Properties
                 :serviceNode="serviceNode"
-                :schema="<Oas3schema>schema.items"
+                :schema="getArraySchema()"
                 :editing="editing"
                 :isNew="isNew"
                 v-model="modelValue[index]"
@@ -67,9 +97,9 @@ watch(async () => props.schema, () => {
         </li>
     </ul>
 
-    <!-- Object -->
     <div v-else-if="schema?.type === 'object' && schema.properties && typeof modelValue === 'object'" class="">
-        <div v-for="key in Object.keys(schema.properties as object)" :key="key" class="">
+        <!-- Object -->
+        <div v-for="key in Object.keys(schema.properties as object)" :key="key" class="mb-2">
 
             <CollapsableList 
                 :openByDefault="openCollapse"
@@ -98,7 +128,6 @@ watch(async () => props.schema, () => {
                     <strong>{{ key }}</strong>
                 </label>
 
-                <!-- Native values: -->
                 <div class="col-sm-10" v-if="schema.properties[key]">
                     <Properties
                         :serviceNode="serviceNode"
@@ -113,8 +142,9 @@ watch(async () => props.schema, () => {
     </div>
 
     <!-- Unknown type -->
-    <div class="d-inline-block ms-3" v-else>{{ modelValue }}</div>
-
+    <div class="d-inline-block ms-3" v-else>
+        {{ modelValue }}
+    </div>
 </template>
 
 <style scoped>

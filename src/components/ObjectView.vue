@@ -227,7 +227,7 @@ async function newObject() {
             </div>
 
             <!-- Object properties: -->
-            <form class="ps-2 mt-2 pt-2"> <!-- v-if="objectSchema && typeof objectNode.object === 'object' && objectSchema?.type === 'object'" -->
+            <form class="ps-2 mt-2 pt-2">
                 <Properties
                     v-if="parentServiceNode"
                     :serviceNode="parentServiceNode"
@@ -239,9 +239,6 @@ async function newObject() {
                 ></Properties>
                 <div v-else class="p-2">Loading summary...</div>
             </form>
-            <!-- <div v-else class="ps-2">
-                {{ objectNode.object }}
-            </div> -->
         </div>
 
         <!-- Sub-service Tabs: -->

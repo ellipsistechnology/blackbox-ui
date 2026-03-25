@@ -91,9 +91,8 @@ export class ServiceNode {
     async getObjects(): Promise<ObjectReference[]> {
         const response = await fetch(this.service.url)
         if(!response.ok) {
-            // console.error(`Error fetching objects from ${this.service.url}: ${response.status} `, await response.json())
-            // return []
-            throw new Error(`Error fetching objects from ${this.service.url}: ${response.status} ` + await response.json())
+            const json = await response.json()
+            throw new Error(`Error fetching objects from ${this.service.url}: ${response.status} ${json?.message ?? JSON.stringify(json)}`)
         }
         const data = await response.json()
         
@@ -193,6 +192,9 @@ export class ServiceNode {
             if(refPath.startsWith('#/')) {
                 // Get schema from path:
                 const pathParts = refPath.substring(2).split('/')
+                if(!this.oasDoc) {
+                    this.resolveSchema() // Load the OpenAPI document if not already loaded.
+                }
                 let subdoc: any = this.oasDoc
                 for(const p of pathParts) {
                     subdoc = subdoc[p]
@@ -245,7 +247,8 @@ export class ObjectReference {
         // Get the full object:
         response = await fetch(this.url)
         if(!response.ok) {
-            throw new Error(`Error fetching object from ${this.url}: ${response.status} ${JSON.stringify(await response.json())}`)
+            const json = await response.json()
+            throw new Error(`Error fetching object from ${this.url}: ${response.status} ${json?.message ?? JSON.stringify(json)}`)
         }
         const data = await response.json()
         return new ObjectNode(this.url, this.service, data, metadata)

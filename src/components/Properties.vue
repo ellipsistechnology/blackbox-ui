@@ -2,8 +2,10 @@
 import type Oas3schema from '@/types/Oas3schema';
 import CollapsableList from './CollapsableList.vue';
 import type { ServiceNode } from '@/BlackboxClient';
+import { onMounted, ref, watch } from 'vue';
 
 const modelValue = defineModel<any>();
+const openCollapse = ref(false)
 
 const emit = defineEmits([
     'save'
@@ -23,6 +25,16 @@ async function resolveRefs(schema: any) {
         props.serviceNode.resolveRefs(schema)
     }
 }
+
+onMounted(async () => {
+    resolveRefs(props.schema)
+    openCollapse.value = true
+})
+
+watch(async () => props.schema, () => {
+    resolveRefs(props.schema)
+    openCollapse.value = true
+})
 </script>
 
 <template>
@@ -30,7 +42,7 @@ async function resolveRefs(schema: any) {
     <!-- Primative: -->
     <div 
         v-if="['number', 'string'].includes(typeof modelValue) || schema && ['number', 'string'].includes(schema.type)"
-        class="d-inline-block ms-3"
+        class="d-inline-block ms-3 w-100"
     >
         <input 
             class="form-control-sm" 
@@ -56,10 +68,11 @@ async function resolveRefs(schema: any) {
     </ul>
 
     <!-- Object -->
-    <div v-else-if="schema?.type === 'object' && schema.properties && typeof modelValue === 'object'">
+    <div v-else-if="schema?.type === 'object' && schema.properties && typeof modelValue === 'object'" class="">
         <div v-for="key in Object.keys(schema.properties as object)" :key="key" class="">
 
             <CollapsableList 
+                :openByDefault="openCollapse"
                 v-if="typeof modelValue[key] === 'object'"
                 :title="key" 
                 @show="resolveRefs(schema.properties[key])"
@@ -80,8 +93,8 @@ async function resolveRefs(schema: any) {
                 </template>
             </CollapsableList>
 
-            <div v-else class="kvpair row mb-2">
-                <label class="col-sm-1 col-form-label col-form-label-sm text-end" :for="key">
+            <div v-else class="kvpair row mb-2 ms-0 me-0">
+                <label class="col-sm-1 col-form-label col-form-label-sm ps-0" :for="key">
                     <strong>{{ key }}</strong>
                 </label>
 
@@ -106,6 +119,6 @@ async function resolveRefs(schema: any) {
 
 <style scoped>
 .kvpair {
-    margin-left: 26px;
+    padding-left: 26px;
 }
 </style>

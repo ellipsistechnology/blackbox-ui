@@ -93,7 +93,7 @@ function removeServer(index: number) {
 
 <template>
     <div class="h-100 p-0">
-        <CollapsableList title="Servers">
+        <CollapsableList title="Servers" openByDefault>
             <template #toolbar>
                 <button class="btn btn-sm btn-outline-secondary no-hover-effect border-0 p-0 pe-2" @click="addingServer = true; focusServerName()" v-if="!addingServer">
                     <i class="bi bi-cloud-plus d-flex align-items-center h-100 fs-larger"></i>

@@ -243,8 +243,13 @@ watch(() => props.showObjects, async (show) => await loadValues())
 watch(() => props.serviceNode, async (_) => await refreshNode())
 
 async function selectObject(obj: ObjectReference) {
-    const objectNode = await obj.getObjectNode()
-    emit('selectObject', objectNode)
+    try {
+        const objectNode = await obj.getObjectNode()
+        emit('selectObject', objectNode)
+    } catch(err: any) {
+        emit('error', `Error selecting object: ${err.message || err}`)
+        console.error(`Error selecting object: `, err)
+    }
 }
 
 function createObject() {
@@ -270,6 +275,22 @@ async function deleteObjects() {
     // Reload the objects list:
     await loadValues()
     checkedObjects.value = new Array(objectRefs.value.length).fill(false)
+}
+
+/**
+ * Render only primative values for the given object.
+ * @param value 
+ */
+function renderObject(value: any): string {
+    if(typeof value === 'object') {
+        return Object.entries(value)
+            .filter(entry => ['string', 'number', 'boolean'].includes(typeof entry[1]))
+            .map(entry => 
+                `${(<any>entry)[0]}: ${renderObject((<any>entry)[1])}`
+            ).join(' | ')
+    } else {
+        return String(value)
+    }
 }
 </script>
 
@@ -336,7 +357,7 @@ async function deleteObjects() {
                     <div v-if="typeof obj.props == 'object'">
                         <div v-for="v in Object.entries(obj.props)">
                             <strong>{{ (<any>v)[0] }}</strong>
-                            &nbsp;- {{ (<any>v)[1] }}
+                            &nbsp;- {{ renderObject((<any>v)[1]) }}
                         </div>
                     </div>
                     <div v-else-if="obj.error" class="text-danger">{{ obj.error?.error || obj.error?.message || obj.error }}</div>

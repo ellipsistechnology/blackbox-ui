@@ -70,7 +70,7 @@ function setNode(type: NodeType, node: Node, reset: boolean, breadcrumbName?: st
     breadcrumbs.value = [{
       type: 'server',
       node: selectedNode.value,
-      label: breadcrumbName ?? (selectedNode.value as RootNode).url.origin,
+      label: breadcrumbName ?? (selectedNode.value as RootNode).url?.toString().replace(/\/$/, ''),//.origin,
       url: (selectedNode.value as RootNode).url
     }]
   }
@@ -118,7 +118,11 @@ function showToast(type: 'error' | 'info', message: string) {
     const toastEl = document.getElementById(type === 'error' ? 'errorToast' : 'infoToast')
     if(!toastEl) return
 
-    const bsToast = new bootstrap.Toast(toastEl!)
+    // const bsToast = new bootstrap.Toast(toastEl!)
+    const bsToast = new bootstrap.Toast(toastEl!, {
+      autohide: type !== 'error',
+      delay: 10000
+    })
     bsToast.show()
 }
 
@@ -220,7 +224,7 @@ async function newObject(serviceNode?: ServiceNode) {
             <template #left>
               <div class="mt-2 ms-1 mb-2">
                 <a class="navbar-brand" href="#" @click="showSidebar = false">
-                  <!-- Burger icon for showing sidebar: -->
+                  <!-- Collapse sidebar: -->
                   <i class="bi bi-arrow-bar-left fs-5"></i>
                 </a>
               </div>
@@ -311,20 +315,18 @@ async function newObject(serviceNode?: ServiceNode) {
       
       <!-- Toast containers -->
       <div class="toast-container position-fixed top-0 end-0 p-3">
-          <div id="infoToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-              <div class="toast-header">
-                  <i class="bi bi-copy me-2"></i>
-                  <strong class="me-auto">{{infoMessage}}</strong>
-                  <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-              </div>
-          </div>
-      </div>
-      <div class="toast-container position-fixed top-0 end-0 p-3">
           <div id="errorToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
               <div class="toast-header">
                   <i class="bi bi-copy me-2"></i>
                   <strong class="me-auto text-danger">{{errorMessage}}</strong>
-                  <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                  <button type="button" class="btn-close text-light btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+              </div>
+          </div>
+          <div id="infoToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+              <div class="toast-header">
+                  <i class="bi bi-copy me-2"></i>
+                  <strong class="me-auto">{{infoMessage}}</strong>
+                  <button type="button" class="btn-close text-light btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
               </div>
           </div>
       </div>

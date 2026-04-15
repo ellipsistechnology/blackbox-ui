@@ -5,6 +5,7 @@ import type Oas3schema from '@/types/Oas3schema';
 import { onMounted, ref, watch } from 'vue';
 import ServiceView from './ServiceView.vue'
 import Properties from './Properties.vue';
+import type Service from '@/types/Service';
 
 const props = defineProps<{
     objectNode: ObjectNode,
@@ -24,6 +25,7 @@ const emit = defineEmits([
 ])
 
 const servicelist = ref<ServiceReference[]>([])
+const services = ref<{ [serviceName: string]: Service}>({})
 const actions = ref<string[]>([])
 const objectSchema = ref<Oas3schema | undefined>(props.objectNode?.service.type?.schema as Oas3schema | undefined)
 const editing = ref<boolean>(false)
@@ -31,6 +33,7 @@ const originalObject = ref<any>(null)
 const selectedTab = ref<string>('summary')
 const selectedService = ref<ServiceNode|null>(null)
 const parentServiceNode = ref<ServiceNode|null>(null)
+const object = ref<any>(props.objectNode ? props.objectNode.object : null)
 
 onMounted(loadObject)
 watch(() => props.objectNode, loadObject)
@@ -49,6 +52,63 @@ async function loadObject() {
     // Resolve relative schema hrefs to absolute URLs:
     parentServiceNode.value = new ServiceNode(props.objectNode.service)
     objectSchema.value = await parentServiceNode.value.resolveSchema()
+
+    // Set schema root:
+    const rootPath = props.objectNode.service.ui?.root
+    object.value = props.objectNode.object
+    if(rootPath) {
+        const segments = rootPath.split('/')
+        for(const segment of segments) {
+            const nextSchema = objectSchema.value?.properties?.[segment]
+            const nextObject = object.value?.[segment]
+            if(nextSchema && nextObject) {
+                objectSchema.value = nextSchema
+                object.value = nextObject
+            } else {
+                console.warn(`Invalid schema root path: ${rootPath}. Segment '${segment}' not found.`)
+                break
+            }
+        }
+    }
+
+    // Sort object properties if sort path is provided:
+    const sortArray = props.objectNode.service.ui?.sort
+    if(sortArray && Array.isArray(sortArray)) {
+        // let schema = objectSchema.value
+        for(const sortEntry of sortArray) {
+            const { path, by, order } = sortEntry
+            const segments = path.split('/').filter((s: any) => s.length > 0)
+            let obj = object.value
+            for(const segment of segments) {
+                if(obj?.[segment]) {
+                    obj = obj[segment]
+                } else {
+                    console.warn(`Invalid sort path: ${path}. Segment '${segment}' not found.`)
+                    break
+                }
+            }
+            if(obj && Array.isArray(obj)) {
+                obj.sort((a: any, b: any) => {
+                    const aValue = a[by]
+                    const bValue = b[by]
+                    if(aValue < bValue) return order === 'asc' ? -1 : 1
+                    if(aValue > bValue) return order === 'asc' ? 1 : -1
+                    return 0
+                })
+            }
+        }
+    }
+
+    // Get services:
+    services.value = {}
+    for(const serviceRef of servicelist.value) {
+        try {
+            const serviceNode = await serviceRef.getServiceNode()
+            services.value[serviceRef.name] = serviceNode.service
+        } catch (err) {
+            console.error(`Error loading service ${serviceRef.name}: `, err)
+        }
+    }
 }
 
 async function selectService(serviceRef: ServiceReference) {
@@ -165,6 +225,7 @@ async function selectObject(objectNode: ObjectNode) {
 async function newObject() {
     emit('newObject', selectedService.value)
 }
+
 </script>
 
 <template>
@@ -185,7 +246,7 @@ async function newObject() {
                     href="#"
                     :class="selectedTab === service.name ? 'active' : ''"
                     @click="selectTab(service)"
-                >{{service.name.charAt(0).toUpperCase() + service.name.substring(1)}}</a>
+                >{{services[service.name]?.ui?.['service-view']?.title ?? service.name.charAt(0).toUpperCase() + service.name.substring(1)}}</a>
             </li>
         </ul>
 
@@ -234,7 +295,9 @@ async function newObject() {
                     :schema="objectSchema"
                     :editing="editing"
                     :isNew="isNew || false"
-                    v-model="objectNode.object"
+                    :display="objectNode.service.ui?.display"
+                    :filter="objectNode.service.ui?.filter"
+                    v-model="object"
                     @save="save()"
                 ></Properties>
                 <div v-else class="p-2">Loading summary...</div>

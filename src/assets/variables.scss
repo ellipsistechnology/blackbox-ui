@@ -75,6 +75,14 @@ $popover-body-padding-x: 15px;
 $popover-bg: $dark;
 $popover-max-width: 500px;
 
+// Tables:
+$table-color: $light;
+$table-bg: $dark;
+$table-border-color: rgba($white, .125);
+$table-striped-bg: rgba($cyan, 0.1);
+$table-hover-bg: rgba($cyan, 0.1);
+$table-active-bg: rgba($cyan, 0.2);
+
 // Fonts:
 $font-family-sans-serif: "Helvetica Neue", "Calibri Light", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 $font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;

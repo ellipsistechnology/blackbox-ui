@@ -257,10 +257,10 @@ export class ObjectReference {
 
 export class ObjectNode {
     constructor(
-        public url: URL,
+        public url: URL, // FIXME: URL is not needed when creating - move to optional parameter and handle null URL in other methods
         public service: Service,
         public object: any, 
-        public metadata: any
+        public metadata: any // FIXME: should be optional
     ) {}
 
     /**

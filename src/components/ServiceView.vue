@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ObjectNode, ObjectReference, ServiceNode } from '@/BlackboxClient';
-import { onMounted, ref, toRaw, watch } from 'vue';
+import { onMounted, onUnmounted, ref, toRaw, watch } from 'vue';
 import ObjectView from './ObjectView.vue';
 
 const props = defineProps<{
@@ -22,6 +22,13 @@ const checkedObjects = ref<boolean[]>([])
 const values = ref<any[]>([])
 const actions = ref<string[]>([])
 const objectError = ref<boolean>(false)
+const name = ref<string>('')
+const summary = ref<string>('')
+const description = ref<string>('')
+const refresh = ref<'never' | 'always' | 'optional' | 'manual'>('never')
+const refreshInterval = ref<number>(60000)
+const manualRefreshSet = ref<boolean>(false)
+let refreshTimeout: number | undefined = undefined
 
 function sendSetService() {
     const iframe = document.getElementById('service-view-iframe') as HTMLIFrameElement
@@ -37,75 +44,95 @@ console.log('Sending set-service message to iframe:', msg)
 }
 
 async function customUIEventListener(event: any) {
-    switch(event.data?.type) {
-        case 'select-object':
-            selectObject(new ObjectReference(new URL(event.data.ref.url), props.serviceNode.service))
-            break
-        case 'create-object':
-            emit('newObject')
-            break
-        case 'get-service':
-            sendSetService()
-            break
-        case 'delete-objects':
-            const refs = event.data.refs as ObjectReference[]
-            deleteByRefs(refs)
-            break
-        case 'update-objects':
-            if(!Array.isArray(event.data.objects) || !Array.isArray(event.data.refs) || event.data.objects.length !== event.data.refs.length) {
-                emit('error', 'Invalid update-objects message format.')
-                return
-            }
-            for(let i = 0; i < event.data.objects.length; i++) {
-                const obj = event.data.objects[i]
-                const ref = event.data.refs[i]
-                if(!ref.url) {
-                    emit('error', 'Invalid object reference in update-objects message.')
-                    continue
+    try {
+        switch(event.data?.type) {
+            case 'select-object':
+                selectObject(new ObjectReference(new URL(event.data.ref.url), props.serviceNode.service))
+                break
+            case 'create-object':
+                emit('newObject')
+                break
+            case 'get-service':
+                await loadValues()
+                sendSetService()
+                break
+            case 'delete-objects':
+                const refs = event.data.refs as ObjectReference[]
+                deleteByRefs(refs)
+                break
+            case 'create-objects':
+                for(let i = 0; i < event.data.objects.length; i++) {
+                    const obj = event.data.objects[i]
+                    new ObjectNode(undefined as any as URL, props.serviceNode.service, obj, undefined).create()
                 }
-                const updatedRef = new ObjectReference(new URL(ref.url), props.serviceNode.service, obj)
-                await updateObject(updatedRef, obj)
-            }
 
-            emit('info', `Updated successfully.`)
-
-            // Reload the objects list:
-            sendSetService()
-            break
-        case 'replace-objects':
-            if(!Array.isArray(event.data.objects) || !Array.isArray(event.data.refs) || event.data.objects.length !== event.data.refs.length) {
-                emit('error', 'Invalid replace-objects message format.')
-                return
-            }
-            for(let i = 0; i < event.data.objects.length; i++) {
-                const obj = event.data.objects[i]
-                const ref = event.data.refs[i]
-                if(!ref.url) {
-                    emit('error', 'Invalid object reference in replace-objects message.')
-                    continue
+                // Reload the objects list:
+                await loadValues() // read the updated values from the service to ensure consistency, then update the iframe with the new data
+                sendSetService()
+                break
+            case 'update-objects':
+                if(!Array.isArray(event.data.objects) || !Array.isArray(event.data.refs) || event.data.objects.length !== event.data.refs.length) {
+                    emit('error', 'Invalid update-objects message format.')
+                    return
                 }
-                const updatedRef = new ObjectReference(new URL(ref.url), props.serviceNode.service, obj)
-                await replaceObject(updatedRef, obj)
-            }
+                for(let i = 0; i < event.data.objects.length; i++) {
+                    const obj = event.data.objects[i]
+                    const ref = event.data.refs[i]
+                    if(!ref.url) {
+                        emit('error', 'Invalid object reference in update-objects message.')
+                        continue
+                    }
+                    const updatedRef = new ObjectReference(new URL(ref.url), props.serviceNode.service, obj)
+                    await updateObject(updatedRef, obj)
+                }
 
-            emit('info', `Replaced successfully.`)
+                emit('info', `Updated successfully.`)
 
-            // Reload the objects list:
-            sendSetService()
-            break
-        case 'info':
-        case 'error':
-            emit(event.data.type, event.data.message)
-            break
+                // Reload the objects list:
+                await loadValues() // read the updated values from the service to ensure consistency, then update the iframe with the new data
+                sendSetService()
+                break
+            case 'replace-objects':
+                if(!Array.isArray(event.data.objects) || !Array.isArray(event.data.refs) || event.data.objects.length !== event.data.refs.length) {
+                    emit('error', 'Invalid replace-objects message format.')
+                    return
+                }
+                for(let i = 0; i < event.data.objects.length; i++) {
+                    const obj = event.data.objects[i]
+                    const ref = event.data.refs[i]
+                    if(!ref.url) {
+                        emit('error', 'Invalid object reference in replace-objects message.')
+                        continue
+                    }
+                    const updatedRef = new ObjectReference(new URL(ref.url), props.serviceNode.service, obj)
+                    await replaceObject(updatedRef, obj)
+                }
+
+                emit('info', `Replaced successfully.`)
+
+                // Reload the objects list:
+                await loadValues() // read the updated values from the service to ensure consistency, then update the iframe with the new data
+                sendSetService()
+                break
+            case 'info':
+            case 'error':
+                emit(event.data.type, event.data.message)
+                break
+        }
+    } catch(err: any) {
+        emit('error', `Error handling message from custom UI: ${err.message || err}`)
+        console.error(`Error handling message from custom UI: `, err)
     }
 }
 
-async function loadValues() {
+async function loadValues(clear = true) {
     // Clear current objects and unique object node (if applicable) to show loading state:
-    if(props.serviceNode.service.access === 'unique') {
-        uniqueObjectNode.value = null
+    if(clear) {
+        if(props.serviceNode.service.access === 'unique') {
+            uniqueObjectNode.value = null
+        }
+        objectRefs.value = []
     }
-    objectRefs.value = []
     objectError.value = false
 
     // If not showing objects, clear the list:
@@ -221,10 +248,18 @@ async function replaceObject(ref: ObjectReference, obj: any) {
 }
 
 async function refreshNode() {
-    await loadValues()
+    await loadValues(false)
     sendSetService()
     actions.value = await props.serviceNode.getActions()
     checkedObjects.value = new Array(objectRefs.value.length).fill(false)
+
+    // Load auto-refresh setting from local storage:
+    if(props.serviceNode.service.ui?.['service-view']?.refresh === 'optional') {
+        const storedSetting = localStorage.getItem(`refresh-${props.serviceNode.service.name}`)
+        if(storedSetting) {
+            manualRefreshSet.value = storedSetting === 'true'
+        }
+    }
 
     // If unique access, load the single object node:
     if(props.serviceNode.service.access === 'unique' && objectRefs.value.length > 0) {
@@ -235,12 +270,47 @@ async function refreshNode() {
     if(props.serviceNode.service.ui?.['auto-open-single'] && objectRefs.value.length === 1 && objectRefs.value[0]) {
         selectObject(objectRefs.value[0])
     }
+
+    // Set UI hints if available:
+    name.value = props.serviceNode.service.ui?.['service-view']?.name ?? props.serviceNode.service.name ?? ''
+    summary.value = props.serviceNode.service.ui?.['service-view']?.summary ?? props.serviceNode.service.summary ?? ''
+    description.value = props.serviceNode.service.ui?.['service-view']?.description ?? props.serviceNode.service.description ?? ''
+    refresh.value = props.serviceNode.service.ui?.['service-view']?.refresh ?? 'never'
+    refreshInterval.value = props.serviceNode.service.ui?.['service-view']?.['refresh-interval'] ?? 60000
+
+    // Setup refresh interval:
+    clearTimeout(refreshTimeout)
+    refreshTimeout = undefined
+    if(refresh.value === 'always' || (refresh.value === 'optional' && manualRefreshSet.value)) {
+        refreshTimeout = setTimeout(() => refreshNode(), refreshInterval.value)
+    }
+}
+
+function toggleManualRefresh() {
+    manualRefreshSet.value = !manualRefreshSet.value
+    if(manualRefreshSet.value) {
+        refreshNode()
+    } else {
+        clearTimeout(refreshTimeout)
+        refreshTimeout = undefined
+    }
+
+    // Save setting to local storage:
+    localStorage.setItem(`refresh-${props.serviceNode.service.name}`, manualRefreshSet.value.toString())
 }
 
 onMounted(refreshNode)
+onUnmounted(() => {
+    clearTimeout(refreshTimeout)
+    refreshTimeout = undefined
+})
 
-watch(() => props.showObjects, async (show) => await loadValues())
-watch(() => props.serviceNode, async (_) => await refreshNode())
+watch(() => props.showObjects, async (_) => await loadValues())
+watch(() => props.serviceNode, async (_) => {
+    clearTimeout(refreshTimeout)
+    refreshTimeout = undefined
+    await refreshNode()
+})
 
 async function selectObject(obj: ObjectReference) {
     try {
@@ -308,14 +378,27 @@ function renderObject(value: any): string {
     <div v-else class="pe-2 mb-3">
         <!-- Service details: -->
         <div class="d-flex flex-row mb-1">
-            <div class="border-end border-dark pe-3 me-3">
-                <h1 class="mb-0">{{ serviceNode.service.name}}</h1>
+            <div v-if="name.length > 0" class="border-end border-dark pe-3 me-3">
+                <h1 class="mb-0">{{ name}}</h1>
             </div>
-            <div class="d-flex align-items-center">
-                <div class="lead">{{ serviceNode.service.summary }}</div>
+            <div v-if="summary.length > 0" class="d-flex align-items-center">
+                <div class="lead">{{ summary }}</div>
+            </div>
+            <div class="ms-auto">
+                <button 
+                    v-if="refresh === 'manual'" 
+                    @click="refreshNode()" 
+                    class="btn border-0"
+                >
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <div v-else-if="refresh === 'optional'" class="form-check form-switch mt-2">
+                    <input class="form-check-input refresh-switch" type="checkbox" role="switch" id="refreshSwitch" :checked="manualRefreshSet" @change="toggleManualRefresh()">
+                    <label class="form-check-label" for="refreshSwitch">Auto-refresh</label>
+                </div>
             </div>
         </div>
-        <div class="mb-3 mt-2">{{ serviceNode.service.description }}</div>
+        <div v-if="description.length > 0" class="mb-3 mt-2">{{ description }}</div>
 
         <!-- Objects list: -->
         <div v-if="showObjects">
@@ -383,8 +466,8 @@ function renderObject(value: any): string {
                     v-if="uniqueObjectNode"
                     :objectNode="uniqueObjectNode" 
                     :showActions="true"
-                    @info="msg => emit('info', msg)"
-                    @error="msg => emit('error', msg)"
+                    @info="(msg: any) => emit('info', msg)"
+                    @error="(msg: any) => emit('error', msg)"
                 ></ObjectView>
                 <div v-else-if="!objectError" class="text-muted">
                     <div>Loading...</div>
@@ -393,3 +476,9 @@ function renderObject(value: any): string {
         </div>
     </div>
 </template>
+
+<style scoped>
+.refresh-switch {
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28255,255,255,0.95%29'/%3e%3c/svg%3e");
+}
+</style>

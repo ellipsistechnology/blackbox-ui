@@ -35,15 +35,24 @@ const selectedService = ref<ServiceNode|null>(null)
 const parentServiceNode = ref<ServiceNode|null>(null)
 const object = ref<any>(props.objectNode ? props.objectNode.object : null)
 
+const refresh = ref<'never' | 'always' | 'optional' | 'manual'>('never')
+const refreshInterval = ref<number>(60000)
+const autoRefreshActive = ref<boolean>(false)
+let refreshTimeout: number | undefined = undefined
+
 onMounted(loadObject)
-watch(() => props.objectNode, loadObject)
+watch(() => props.objectNode, () => loadObject())
 watch(() => props.isNew, () => {
     if(props.isNew) {
         selectedTab.value = 'summary'
     }
 })
 
-async function loadObject() {
+async function loadObject(refetch: boolean = false) {
+    if(refetch) {
+        await props.objectNode.reload() // retrieve the latest data
+    }
+
     servicelist.value = await props.objectNode.getServiceList()
     actions.value = await props.objectNode.getActions()
 
@@ -108,6 +117,25 @@ async function loadObject() {
         } catch (err) {
             console.error(`Error loading service ${serviceRef.name}: `, err)
         }
+    }
+
+    // Set UI hints if available:
+    refresh.value = props.objectNode.service.ui?.['object-view']?.refresh ?? 'never'
+    refreshInterval.value = props.objectNode.service.ui?.['object-view']?.['refresh-interval'] ?? 60000
+
+    // Load auto-refresh setting from local storage:
+    if(props.objectNode.service.ui?.['object-view']?.refresh === 'optional') {
+        const storedSetting = localStorage.getItem(`refresh-${props.objectNode.service.name}-object`)
+        if(storedSetting) {
+            autoRefreshActive.value = storedSetting === 'true'
+        }
+    }
+
+    // Setup refresh interval:
+    clearTimeout(refreshTimeout)
+    refreshTimeout = undefined
+    if(refresh.value === 'always' || (refresh.value === 'optional' && autoRefreshActive.value)) {
+        refreshTimeout = setTimeout(() => loadObject(true), refreshInterval.value)
     }
 }
 
@@ -202,6 +230,7 @@ async function deleteObject() {
     }
 }
 
+// TODO: Refresh when summary tab is selected.
 async function selectTab(serviceRef: ServiceReference|null) {
     console.log(`selecting tab ${serviceRef?.name}`);
     
@@ -224,6 +253,19 @@ async function selectObject(objectNode: ObjectNode) {
 
 async function newObject() {
     emit('newObject', selectedService.value)
+}
+
+function toggleAutoRefresh() {
+    autoRefreshActive.value = !autoRefreshActive.value
+    if(autoRefreshActive.value) {
+        loadObject(true)
+    } else {
+        clearTimeout(refreshTimeout)
+        refreshTimeout = undefined
+    }
+
+    // Save setting to local storage:
+    localStorage.setItem(`refresh-${props.objectNode.service.name}-object`, autoRefreshActive.value.toString())
 }
 
 </script>
@@ -252,6 +294,24 @@ async function newObject() {
 
         <!-- Summary Tab OR not displayed as tabs -->
         <div v-if="selectedTab === 'summary'">
+
+            <!-- Refresh controls. -->
+             <div class="d-flex flex-row">
+                <div class="ms-auto">
+                    <button 
+                        v-if="refresh === 'manual'" 
+                        @click="loadObject(true)" 
+                        class="btn border-0"
+                    >
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    <div v-else-if="refresh === 'optional'" class="form-check form-switch mt-2">
+                        <input class="form-check-input refresh-switch" type="checkbox" role="switch" id="refreshSwitch" :checked="autoRefreshActive" @change="toggleAutoRefresh()">
+                        <label class="form-check-label" for="refreshSwitch">Auto-refresh</label>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Toolbar: -->
             <div class="d-flex flex-row justify-content-between mb-1 bg-dark">
                 <div>
@@ -295,7 +355,7 @@ async function newObject() {
                     :schema="objectSchema"
                     :editing="editing"
                     :isNew="isNew || false"
-                    :display="objectNode.service.ui?.display"
+                    :display="objectNode.service.ui?.['object-view']?.display"
                     :filter="objectNode.service.ui?.filter"
                     v-model="object"
                     @save="save()"

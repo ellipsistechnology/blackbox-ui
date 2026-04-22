@@ -323,4 +323,13 @@ export class ObjectNode {
             throw new Error(`Error creating object at ${this.service.url}: ${response.status} ${JSON.stringify(message)}`)
         }
     }
+
+    async reload(): Promise<void> {
+        const response = await fetch(this.url)
+        if(!response.ok) {
+            const json = await response.json()
+            throw new Error(`Error fetching object from ${this.url}: ${response.status} ${json?.message ?? JSON.stringify(json)}`)
+        }
+        this.object = await response.json()
+    }
 }

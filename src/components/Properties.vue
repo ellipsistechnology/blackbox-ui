@@ -9,7 +9,7 @@ type Type = 'unknown' | 'primative' | 'array' | 'object'
 const modelValue = defineModel<any>();
 const openCollapse = ref(false)
 const schemaType = ref<Type>('unknown')
-const checkedFilters = ref<{[key: string]: string[]}>({})
+const filterSelection = ref<{[key: string]: {[value: string]: boolean}}>({}) // field key -> possible field value -> is selected
 const filteredData = ref<any[]>([])
 
 const emit = defineEmits([
@@ -114,12 +114,12 @@ function loadFilters() {
     // Look for filter selection in local storage:
     const name = `${props.serviceNode.service.name}-filters`
     if(localStorage.getItem(name)) {
-        const storedFilters = JSON.parse(localStorage.getItem(name)!)
-        checkedFilters.value = storedFilters
+        filterSelection.value = JSON.parse(localStorage.getItem(name)!)
     } else {
-        // If no stored filters, initialize with all options selected:
+        // If no stored filters, initialize with no selection 
+        // (default is not filtered, so this is equivalent to having all options selected):
         props.filter?.forEach(key => {
-            checkedFilters.value[key] = getFilterLabels(key)
+            filterSelection.value[key] = {}//getFilterLabels(key)
         })
     }
 
@@ -127,33 +127,41 @@ function loadFilters() {
 }
 
 function filterData() {
-    if(!Array.isArray(toRaw(modelValue.value))) {
+    const array = toRaw(modelValue.value)
+    if(!Array.isArray(array)) {
         return
     }
-    filteredData.value = toRaw(modelValue.value).filter((entry: any) => {
-        return Object.keys(checkedFilters.value).every(item => {
-            if(!checkedFilters.value[item] || checkedFilters.value[item].length === 0) {
-                return true
+
+    filteredData.value = array.filter((entry: any) => {
+        // Check if entry matches all selected filters. 
+        // 
+        return Object.keys(filterSelection.value).every(key => {
+            const value = entry[key]
+
+            // Default to selected if this field's value is not in the selection list. 
+            // This means that if the user has not explicitly selected any filters for a field, or if new values appear that 
+            // were not previously selectable, they will be included by default.
+            if(filterSelection.value[key]?.[value] === undefined) {
+                return true 
             }
-            return checkedFilters.value[item].includes(entry[item])
+            return filterSelection.value[key][value]
         })
     })
 }
 
-function selectFilter(item: string, label: string) {
+function toggleFilter(item: string, label: string) {
     // Update selection:
-    if(!checkedFilters.value[item]) {
-        checkedFilters.value[item] = []
+    if(filterSelection.value[item] === undefined) {
+        filterSelection.value[item] = {}
     }
-    const index = checkedFilters.value[item].indexOf(label)
-    if(index > -1) {
-        checkedFilters.value[item].splice(index, 1)
+    if(filterSelection.value[item][label] === undefined) {
+        filterSelection.value[item][label] = false // default was true, so toggle to false
     } else {
-        checkedFilters.value[item].push(label)
+        filterSelection.value[item][label] = !filterSelection.value[item][label]
     }
 
     // Save to local storage:
-    localStorage.setItem(`${props.serviceNode.service.name}-filters`, JSON.stringify(checkedFilters.value))
+    localStorage.setItem(`${props.serviceNode.service.name}-filters`, JSON.stringify(filterSelection.value))
 
     // Filter data:
     filterData()
@@ -168,10 +176,8 @@ function onViewShown() {
 
 onMounted(onViewShown)
 onActivated(onViewShown)
-
-watch(async () => props.schema, () => {
-    onViewShown()
-})
+watch(async () => props.schema, onViewShown)
+watch(async () => modelValue.value, onViewShown, { deep: true })
 
 watch(() => props.serviceNode.service.url.toString(), () => {
     onViewShown()
@@ -207,31 +213,38 @@ watch(() => props.serviceNode.service.url.toString(), () => {
                 ></Properties>
             </div>
         </div>
-        <div v-else-if="display === 'table' && getArraySchema()?.properties" class="table-responsive mb-3 border border-dark rounded">
+        <div
+            v-else-if="display === 'table' && getArraySchema()?.properties"
+            class="table-responsive table-responsive-dropdown-visible mb-3 border border-dark rounded"
+            :class="{
+                'table-with-filters-min-height': (filter?.length ?? 0) > 0,
+                'table-empty-with-filters': filteredData.length === 0 && (filter?.length ?? 0) > 0
+            }"
+        >
             <table class="table table-sm mb-0">
                 <tbody>
                     <tr>
-                        <td v-for="(item, index) of Object.keys(getArraySchema()!.properties!)" :key="index" class="text-start align-top ms-0 ps-0 mt-2 mb-1 bg-dark">
-                            <div v-if="filter?.includes(item)" class="dropdown">
+                        <td v-for="(key, index) of Object.keys(getArraySchema()!.properties!)" :key="index" class="text-start align-top ms-0 ps-0 mt-2 mb-1 bg-dark">
+                            <div v-if="filter?.includes(key)" class="dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <strong class="text-info ms-3 fw-bold">{{ item }}</strong>
+                                    <strong class="text-info ms-3 fw-bold">{{ key }}</strong>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-light">
-                                    <li v-for="label of getFilterLabels(item)" class="form-check ms-2">
+                                    <li v-for="label of getFilterLabels(key)" class="form-check ms-2">
                                         <input 
                                             class="form-check-input" 
                                             type="checkbox" 
                                             :value="label" 
-                                            :id="`${item}-${label}`"
-                                            :checked="checkedFilters[item]?.includes(label) ?? false"
-                                            @change="selectFilter(item, label)">
-                                        <label class="form-check-label" :for="`${item}-${label}`">
+                                            :id="`${key}-${label}`"
+                                            :checked="filterSelection[key]?.[label] ?? true"
+                                            @change="toggleFilter(key, label)">
+                                        <label class="form-check-label" :for="`${key}-${label}`">
                                             {{ label }}
                                         </label>
                                     </li>
                                 </ul>
                             </div>
-                            <strong v-else class="text-info ms-3 fw-bold">{{ item }}</strong>
+                            <strong v-else class="text-info ms-3 fw-bold">{{ key }}</strong>
                         </td>
                     </tr>
                     <tr v-for="(data, index) in filteredData" :key="index">
@@ -314,5 +327,18 @@ watch(() => props.serviceNode.service.url.toString(), () => {
 <style scoped>
 .kvpair {
     padding-left: 26px;
+}
+
+.table-responsive-dropdown-visible {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+.table-with-filters-min-height {
+    min-height: 12rem;
+}
+
+.table-empty-with-filters {
+    padding-bottom: 14rem;
 }
 </style>

@@ -27,8 +27,9 @@ const summary = ref<string>('')
 const description = ref<string>('')
 const refresh = ref<'never' | 'always' | 'optional' | 'manual'>('never')
 const refreshInterval = ref<number>(60000)
-const manualRefreshSet = ref<boolean>(false)
+const autoRefreshActive = ref<boolean>(false)
 let refreshTimeout: number | undefined = undefined
+const display = ref<'table' | 'list'>('list')
 
 function sendSetService() {
     const iframe = document.getElementById('service-view-iframe') as HTMLIFrameElement
@@ -257,7 +258,7 @@ async function refreshNode() {
     if(props.serviceNode.service.ui?.['service-view']?.refresh === 'optional') {
         const storedSetting = localStorage.getItem(`refresh-${props.serviceNode.service.name}`)
         if(storedSetting) {
-            manualRefreshSet.value = storedSetting === 'true'
+            autoRefreshActive.value = storedSetting === 'true'
         }
     }
 
@@ -281,14 +282,14 @@ async function refreshNode() {
     // Setup refresh interval:
     clearTimeout(refreshTimeout)
     refreshTimeout = undefined
-    if(refresh.value === 'always' || (refresh.value === 'optional' && manualRefreshSet.value)) {
+    if(refresh.value === 'always' || (refresh.value === 'optional' && autoRefreshActive.value)) {
         refreshTimeout = setTimeout(() => refreshNode(), refreshInterval.value)
     }
 }
 
-function toggleManualRefresh() {
-    manualRefreshSet.value = !manualRefreshSet.value
-    if(manualRefreshSet.value) {
+function toggleAutoRefresh() {
+    autoRefreshActive.value = !autoRefreshActive.value
+    if(autoRefreshActive.value) {
         refreshNode()
     } else {
         clearTimeout(refreshTimeout)
@@ -296,7 +297,7 @@ function toggleManualRefresh() {
     }
 
     // Save setting to local storage:
-    localStorage.setItem(`refresh-${props.serviceNode.service.name}`, manualRefreshSet.value.toString())
+    localStorage.setItem(`refresh-${props.serviceNode.service.name}`, autoRefreshActive.value.toString())
 }
 
 onMounted(refreshNode)
@@ -377,7 +378,7 @@ function renderObject(value: any): string {
     <!-- Standard UI: -->
     <div v-else class="pe-2 mb-3">
         <!-- Service details: -->
-        <div class="d-flex flex-row mb-1">
+        <div class="d-flex flex-row">
             <div v-if="name.length > 0" class="border-end border-dark pe-3 me-3">
                 <h1 class="mb-0">{{ name}}</h1>
             </div>
@@ -393,7 +394,7 @@ function renderObject(value: any): string {
                     <i class="bi bi-arrow-clockwise"></i>
                 </button>
                 <div v-else-if="refresh === 'optional'" class="form-check form-switch mt-2">
-                    <input class="form-check-input refresh-switch" type="checkbox" role="switch" id="refreshSwitch" :checked="manualRefreshSet" @change="toggleManualRefresh()">
+                    <input class="form-check-input refresh-switch" type="checkbox" role="switch" id="refreshSwitch" :checked="autoRefreshActive" @change="toggleAutoRefresh()">
                     <label class="form-check-label" for="refreshSwitch">Auto-refresh</label>
                 </div>
             </div>
@@ -424,9 +425,9 @@ function renderObject(value: any): string {
                         <i class="bi bi-trash3"></i>
                     </button>
                 </div>
-                <div>
-                    <button class="btn border-0 disabled"><i class="bi bi-table"></i></button>
-                    <button class="btn border-0 disabled"><i class="bi bi-list-ul"></i></button>
+                <div> <!-- TODO: Implement table view. -->
+                    <button type="button" class="btn border-0 bg-opacity-25" :class="display === 'table' ? 'bg-secondary' : 'bg-transparent'" @click="display = 'table'"><i class="bi bi-table"></i></button>
+                    <button type="button" class="btn border-0 bg-opacity-25" :class="display === 'list' ? 'bg-secondary' : 'bg-transparent'" @click="display = 'list'"><i class="bi bi-list-ul"></i></button>
                 </div>
             </div>
 
@@ -445,10 +446,7 @@ function renderObject(value: any): string {
                     </div>
                     <div v-else-if="obj.error" class="text-danger">{{ obj.error?.error || obj.error?.message || obj.error }}</div>
                     <div v-else>{{ obj.props }}</div>
-                    <button class="ms-auto btn border-0 disabled">
-                        <i class="bi bi-grip-horizontal"></i>
-                    </button>
-                    <div class="d-flex align-items-center">
+                    <div class="d-flex align-items-center ms-auto">
                         <input 
                             class="form-check-input mt-0" 
                             type="checkbox" 

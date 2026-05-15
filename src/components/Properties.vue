@@ -91,7 +91,8 @@ function isSchemaObject(): boolean {
 
 function resolveSchemaType() {
     const rawValue = toRaw(modelValue.value)
-    if(isSchemaPrimative() && ['number', 'string', 'boolean'].includes(typeof rawValue)) {
+console.log(`resolving schema type for schema (primative: ${isSchemaPrimative()}, raw: ${rawValue}(${typeof rawValue})): ${JSON.stringify(props.schema)}`)
+    if(isSchemaPrimative() && ['number', 'string', 'boolean', 'undefined'].includes(typeof rawValue)) {
         schemaType.value = 'primative'
     } else if(isSchemaArray() && Array.isArray(rawValue)) {
         schemaType.value = 'array'

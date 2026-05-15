@@ -23,10 +23,18 @@ watch(() => props.rootNode, async (newRootNode) => {
     }
     try {
         const references = await newRootNode.getServiceList()
-        serviceList.value = await Promise.all(references.map(async ref => await ref.getServiceNode()))
+        serviceList.value = []
+        references.forEach(async ref => {
+            try {
+                serviceList.value?.push(await ref.getServiceNode())
+            } catch (e) {
+                console.error(`Error loading service node for reference ${ref.url}`, e)
+            }
+        })
     } catch (e: any) {
         serviceList.value = []
-        emit('error', e?.message || e)
+        console.error('Error loading service list', e)
+        emit('error', "Error loading services.")
     }
 }, { immediate: true })
 </script>

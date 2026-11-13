@@ -381,9 +381,34 @@ function toggleAutoRefresh() {
             v-if="!isNew && servicelist && servicelist.length > 0 && objectNode.service.ui?.['subservice-display'] !== 'tabs'" 
             class="ps-2 mt-2 border-top border-dark pt-2 flex-grow-1"
         >
-            <h5>Services provided by this object:</h5>
-            <div v-for="serviceRef in servicelist" class="list-group list-group-flush">
-                <a href="#" @click="selectService(serviceRef)" class="list-group-item list-group-item-action ps-2 pe-2 pt-1 pb-1"><strong>{{ serviceRef.name }}</strong></a>
+            <div v-if="objectNode.service.ui?.['subservice-display'] === 'grid'">
+                <!-- Grid display using a Bootstrap cards: -->
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+                    <div v-for="serviceRef in servicelist" :key="serviceRef.name" class="col">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h5 class="card-title mb-0">{{services[serviceRef.name]?.ui?.['service-view']?.title ?? serviceRef.name.charAt(0).toUpperCase() + serviceRef.name.substring(1)}}</h5>
+                                    <small class="text-secondary">{{services[serviceRef.name]?.summary}}</small>
+                                </div>
+                                <a href="#" @click.stop="selectService(serviceRef)"><i class="bi bi-arrow-up-right-square"></i></a>
+                            </div>
+                            <div class="card-body">
+                                {{services[serviceRef.name]?.description}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-else>
+                <!-- Default display as service list: -->
+                <h5>Services provided by this object:</h5>
+                <div v-for="serviceRef in servicelist" class="list-group list-group-flush">
+                    <a href="#" @click="selectService(serviceRef)" class="list-group-item list-group-item-action ps-2 pe-2 pt-1 pb-1">
+                        <strong>{{services[serviceRef.name]?.ui?.['service-view']?.title ?? serviceRef.name.charAt(0).toUpperCase() + serviceRef.name.substring(1)}}</strong>
+                        <small class="text-secondary ms-3">{{services[serviceRef.name]?.summary}}</small>
+                    </a>
+                </div>
             </div>
         </div>
     </div>

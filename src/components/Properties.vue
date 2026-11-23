@@ -4,7 +4,7 @@ import CollapsableList from './CollapsableList.vue';
 import type { ServiceNode } from '@/BlackboxClient';
 import { onActivated, onMounted, ref, toRaw, watch } from 'vue';
 
-type Type = 'unknown' | 'primative' | 'array' | 'object'
+type Type = 'unknown' | 'primitive' | 'array' | 'object' // FIXME spelling mistake "primitive"
 
 const modelValue = defineModel<any>();
 const openCollapse = ref(false)
@@ -91,9 +91,8 @@ function isSchemaObject(): boolean {
 
 function resolveSchemaType() {
     const rawValue = toRaw(modelValue.value)
-console.log(`resolving schema type for schema (primitive: ${isSchemaPrimitive()}, raw: ${rawValue}(${typeof rawValue})): ${JSON.stringify(props.schema)}`)
     if(isSchemaPrimitive() && ['number', 'string', 'boolean', 'undefined'].includes(typeof rawValue)) {
-        schemaType.value = 'primative'
+        schemaType.value = 'primitive'
     } else if(isSchemaArray() && Array.isArray(rawValue)) {
         schemaType.value = 'array'
     } else if(isSchemaObject() && typeof rawValue === 'object') {
@@ -187,10 +186,10 @@ watch(() => props.serviceNode.service.url.toString(), () => {
 
 <template>
     <div 
-        v-if="schemaType === 'primative'"
+        v-if="schemaType === 'primitive'"
         class="d-inline-block ms-3 w-100"
     >
-        <!-- Primative: -->
+        <!-- Primitive: -->
         <input 
             class="form-control-sm" 
             :readonly="!editing && !isNew" 

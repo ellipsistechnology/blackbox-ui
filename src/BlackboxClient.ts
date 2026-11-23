@@ -311,6 +311,7 @@ export class ObjectNode {
     }
 
     async create(): Promise<void> {
+console.log(`Creating object at ${this.service.url} with data: `, this.object)
         const response = await fetch(this.service.url, {
             method: 'POST',
             headers: {

@@ -173,6 +173,7 @@ async function save() {
 
     // Save the object via the API:
     try {
+        props.objectNode.object = object.value // update the objectNode's object with the latest changes
         await props.objectNode[method]()
     } catch (err) {
         console.error(`Error saving object: `, err)

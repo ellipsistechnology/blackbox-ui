@@ -24,7 +24,7 @@ async function getServiceList(url: string | URL): Promise<ServiceReference[]> {
     }
     const data = await response.json()
     if(!data.services || !Array.isArray(data.services)) {
-        console.log(`No services array found in response from ${url}: `, data)
+        console.log(`No services array found in response from ${url}.`)
         return []
     }
     return data.services.map((s: any) => new ServiceReference(new URL(s.href, url), s.name))
@@ -131,7 +131,7 @@ export class ServiceNode {
         }
         const metaUrl = new URL(this.service.url)
         metaUrl.searchParams.set('meta', '')
-        return await getServiceList(metaUrl)
+        return (await getServiceList(metaUrl))
     }
 
     async getActions(): Promise<Action[]> {
@@ -143,6 +143,7 @@ export class ServiceNode {
      * @returns 
      */
     async resolveSchema(): Promise<Oas3schema | undefined> {
+console.log(`Service: `, this.service)
         const schema = this.service.type?.schema as {href: string}
     
         if(schema?.href) {
@@ -239,8 +240,8 @@ export class ObjectReference {
         const metaUrl = new URL(this.url!)
         metaUrl.searchParams.set('meta', '')
         let response = await fetch(metaUrl)
+        metadata = await response.json()
         if(!response.ok) {
-            metadata = await response.json()
             console.error(`Could not fetch metadata for object from ${metaUrl}: ${response.status} `, metadata)
         }
 

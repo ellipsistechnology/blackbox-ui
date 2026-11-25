@@ -55,10 +55,10 @@ function isSchemaPrimitive(): boolean {
     }
 
     if(props.schema.anyOf) {
-        return props.schema.anyOf.some((s: any) => ['string', 'number', 'boolean'].includes(s.type))
+        return props.schema.anyOf.some((s: any) => ['string', 'number', 'integer', 'boolean'].includes(s.type))
     } else {
         const type = props.schema.type
-        return ['string', 'number', 'boolean'].includes(type)
+        return ['string', 'number', 'integer', 'boolean'].includes(type)
     }
 }
 
@@ -318,8 +318,8 @@ watch(() => props.serviceNode.service.url.toString(), () => {
         </div>
     </div>
 
-    <!-- Unknown type -->
     <div class="d-inline-block ms-3" v-else>
+        <!-- Unknown type -->
         {{ modelValue }}
     </div>
 </template>

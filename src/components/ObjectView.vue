@@ -162,7 +162,7 @@ async function save() {
     // Parse any fields that should be numbers:
     if(objectSchema.value && objectSchema.value.type === 'object' && objectSchema.value.properties) {
         for(const [key, propSchema] of Object.entries(objectSchema.value.properties)) {
-            if(propSchema.type === 'number' && typeof props.objectNode.object[key] === 'string') {
+            if((propSchema.type === 'number' || propSchema.type == 'integer') && typeof props.objectNode.object[key] === 'string') {
                 const parsed = parseFloat(props.objectNode.object[key])
                 if(!isNaN(parsed)) {
                     props.objectNode.object[key] = parsed
